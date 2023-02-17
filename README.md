@@ -20,5 +20,5 @@ Currently all paths are hardcoded in vgpaths.py. This will get cleaned up at som
 * sds: create factor graphs, run MAP inference on given collection of sentences
 * zoom_in: interactively inspect sentences, make factor graphs, run MAP inference, marginal inference and what-if analyses
 
-* Evaluation*:
+*Evaluation*:
 * eval_cloze: evaluation for Cloze disambiguation task
