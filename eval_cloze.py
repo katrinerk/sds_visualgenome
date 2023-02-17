@@ -14,7 +14,6 @@ import numpy as np
 import random
 import statistics
 
-import text_histogram 
 import vgiterator
 from sds_input_util import VGSentences, VGParam
 import sentence_util

@@ -15,7 +15,6 @@ import math
 import numpy as np
 import random
 
-import text_histogram 
 import vgiterator
 from sds_input_util import VGSentences, VGParam
 from vgindex import VgitemIndex
@@ -73,17 +72,17 @@ for img, frequent_objects in vgobj.each_image_objects(img_ids = trainset):
     for label in frequent_objects:
         obj_count[ label ] += 1
 
-# show histogram
-if show_stats:
-    print(text_histogram.histogram(list(obj_count.values())))
-    print("zooming in")
-    print(text_histogram.histogram(list([v for v in obj_count.values() if v < 1700])))
-    print("zooming in again")
-    print(text_histogram.histogram(list([v for v in obj_count.values() if v < 200])))
-    print()
+# # show histogram
+# if show_stats:
+#     print(text_histogram.histogram(list(obj_count.values())))
+#     print("zooming in")
+#     print(text_histogram.histogram(list([v for v in obj_count.values() if v < 1700])))
+#     print("zooming in again")
+#     print(text_histogram.histogram(list([v for v in obj_count.values() if v < 200])))
+#     print()
 
-    for lower, upper in bins:
-        print(lower, "to", upper, sum(1 for v in obj_count.values() if v >= lower and v < upper))
+#     for lower, upper in bins:
+#         print(lower, "to", upper, sum(1 for v in obj_count.values() if v >= lower and v < upper))
 
 #########
 random.seed(6543)

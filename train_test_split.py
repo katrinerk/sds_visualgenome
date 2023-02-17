@@ -10,7 +10,6 @@ import json
 import zipfile
 from collections import defaultdict, Counter
 import random
-import text_histogram 
 
 import vgiterator
 from vgpaths import VGPaths
@@ -86,16 +85,16 @@ for img, frequent_rel in vgobj.each_image_relations():
 
 print("--")
 print("Number of object instances: Training:", train_objects.total())
-print(text_histogram.histogram(list(train_objects.values())))
+#print(text_histogram.histogram(list(train_objects.values())))
 print("Number of object instances: Test:", test_objects.total())
-print(text_histogram.histogram(list(test_objects.values())))
+#print(text_histogram.histogram(list(test_objects.values())))
 print("--")
 print("Number of attribute instances: Training:", train_attrib.total())
-print(text_histogram.histogram(list(train_attrib.values())))
+#print(text_histogram.histogram(list(train_attrib.values())))
 print("Number of attribute instances: Test", test_attrib.total())
-print(text_histogram.histogram(list(test_attrib.values())))
+#print(text_histogram.histogram(list(test_attrib.values())))
 print("--")
 print("Number of relation instances: Training:", train_rel.total())
-print(text_histogram.histogram(list(train_rel.values())))
+#print(text_histogram.histogram(list(train_rel.values())))
 print("Number of relation instances: Test", test_rel.total())
-print(text_histogram.histogram(list(test_rel.values())))
+#print(text_histogram.histogram(list(test_rel.values())))

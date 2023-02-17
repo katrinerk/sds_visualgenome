@@ -11,7 +11,6 @@ import json
 import zipfile
 from collections import defaultdict, Counter
 import random
-import text_histogram 
 
 import vgiterator
 from vgpaths import VGPaths

@@ -16,7 +16,6 @@ import math
 import numpy as np
 import random
 
-import text_histogram 
 import vgiterator
 from sds_input_util import VGSentences, VGParam
 from vgindex import VgitemIndex
