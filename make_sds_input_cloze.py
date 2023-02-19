@@ -42,7 +42,7 @@ max_sentences_per_clozepair = 50
 ##################
 # read data
 
-vgpath_obj = VGPaths(sdsdata = "/Users/kee252/Projects/SDS/sdsdata_cloze/")
+vgpath_obj = VGPaths(sdsdata = "sds_in/cloze")
 
 # read frequent objects, attributes, relations
 vgcounts_zipfilename, vgcounts_filename = vgpath_obj.vg_counts_zip_and_filename()

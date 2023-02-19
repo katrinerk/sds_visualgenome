@@ -20,6 +20,8 @@ import sentence_util
 from vgindex import VgitemIndex
 from vgpaths import VGPaths
 
+########
+outdir = "inspect_output/cloze"
 
 ########3
 
@@ -140,7 +142,6 @@ for clozeword_id in sorted(clozeword_model_acc.keys(), key = lambda c: sum(goldd
     
 ###
 # write to file: per-clozeword evaluation and list of wrongly classified cases
-outdir = "eval_cloze_detail"
 
 # obtain topic characterizations
 topic_obj = sentence_util.TopicInfoUtil(vgpath_obj)
