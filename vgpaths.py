@@ -43,6 +43,10 @@ class VGPaths:
     def vg_traintest_zip_and_filename(self):
         return (os.path.join(self.datapath, "traintest.json.zip"), "traintest.json")
 
+    # where to find VG-based vectors
+    def vg_vecfilename(self):
+        return os.path.join(self.datapath, "ext2vec.dm")
+
     #######3
     # gensim related paths
     # where to store the gensim dictionary

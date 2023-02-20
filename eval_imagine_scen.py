@@ -1,7 +1,7 @@
-# Katrin Erk January 2023
-# evaluate SDS output on cloze task:
-# global evaluation, not zoom-in
-
+# Katrin Erk February 2023
+# evaluate SDS on task of
+# predicting additional objects from the
+# scenarios in a sentence
 
 import sys
 import os

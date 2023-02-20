@@ -13,7 +13,6 @@ import random
 import statistics
 from argparse import ArgumentParser
 
-import text_histogram 
 import vgiterator
 from vgindex import VgitemIndex
 from vgpaths import VGPaths

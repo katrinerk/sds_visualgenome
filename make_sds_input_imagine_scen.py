@@ -20,7 +20,7 @@ from sds_input_util import VGSentences, VGParam
 from vgindex import VgitemIndex
 from vgpaths import VGPaths
 
-num_testsentences = 20
+num_testsentences = 100
 max_num_objects_tokeep = 25
 shortsentence_fraction_test = 0.3
 
