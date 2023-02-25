@@ -29,7 +29,7 @@ class VGParam:
         self.vgpath_obj = vgpath_obj
 
         # keep how many scenarios per concept? 
-        self.top_scenarios_per_concept = 5
+        self.top_scenarios_per_concept = top_scenarios_per_concept
 
         if frequentobj is None:
 
@@ -209,7 +209,7 @@ class VGParam:
 
         ##
         # global file: alpha, number of concepts (objects, attributes, relations), number of scenarios, number of words
-        filenames = self.vgpath_obj.sds_filenames()
+        filenames = self.vgpath_obj.sds_filenames(write = True)
         with open(filenames["general"], "w") as outf:
             print(json.dumps(global_param), file = outf)
 
@@ -465,7 +465,7 @@ class VGSentences:
             
             outjson.append( { "sentence_id" : sentid, "sentence" : words  + roles } )
         
-        zipfilename, filename = self.vgpath_obj.sds_sentence_zipfilename()
+        zipfilename, filename = self.vgpath_obj.sds_sentence_zipfilename(write = True)
         with zipfile.ZipFile(zipfilename, "w", zipfile.ZIP_DEFLATED) as azip:
             azip.writestr(filename, json.dumps(outjson))
 

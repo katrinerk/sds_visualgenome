@@ -11,10 +11,9 @@ import os
 import json
 import zipfile
 from collections import defaultdict, Counter
-import nltk
 import math
 import numpy as np
-import random
+from argparse import ArgumentParser
 
 import vgiterator
 from sds_input_util import VGSentences, VGParam
@@ -24,18 +23,30 @@ from vgpaths import VGPaths
 
 ########3
 
-vgpath_obj = VGPaths()
+
+
+
+parser = ArgumentParser()
+parser.add_argument('--output', help="directory to write output to, default: sds_in/vanilla", default = "sds_in/vanilla/")
+parser.add_argument('--vgdata', help="directory with VG data including frequent items, train/test split, topic model", default = "data/")
+parser.add_argument('--scen_per_concept', help="Number of top scenarios to record for a concept, default 5", type = int, default = 5)
+
+args = parser.parse_args()
+
+
+vgpath_obj = VGPaths(vgdata = args.vgdata,  sdsdata = args.output)
 
 print("reading data")
 
+# frequent obj/attr/rel
 vgcounts_zipfilename, vgcounts_filename = vgpath_obj.vg_counts_zip_and_filename()
 with zipfile.ZipFile(vgcounts_zipfilename) as azip:
     with azip.open(vgcounts_filename) as f:
         vgobjects_attr_rel = json.load(f)
+        
 vgindex_obj = VgitemIndex(vgobjects_attr_rel)
 
-# obtain IDs of training and test images
-
+# training/test split
 split_zipfilename, split_filename = vgpath_obj.vg_traintest_zip_and_filename()
 with zipfile.ZipFile(split_zipfilename) as azip:
     with azip.open(split_filename) as f:
@@ -43,12 +54,11 @@ with zipfile.ZipFile(split_zipfilename) as azip:
     
 trainset = set(traintest_split["train"])
 
-vgobj = vgiterator.VGIterator()
+vgobj = vgiterator.VGIterator(vgcounts = vgobjects_attr_rel)
 
 ####
 # write parameters for SDS.
-# the only thing we need to change are the concept/word probabilities
-vgparam_obj = VGParam(vgpath_obj, frequentobj = vgobjects_attr_rel)
+vgparam_obj = VGParam(vgpath_obj, top_scenarios_per_concept = args.scen_per_concept, frequentobj = vgobjects_attr_rel)
 
 print("computing parameters")
 

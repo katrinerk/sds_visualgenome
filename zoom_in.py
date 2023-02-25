@@ -176,6 +176,10 @@ or q to stop analyzing this sentence: """)
 
 parser = ArgumentParser()
 parser.add_argument('input', help="directory with input sentences")
+parser.add_argument('--tilesize', help="Scenario tiling: number of scenarios restricted by one Dir-Mult factor, default: 6", type = int, default = 6)
+parser.add_argument('--tileovl', help="Scenario tiling: overlap between tiles, default: 2", type = int, default = 2)
+parser.add_argument('--cloze', help="Look for additional cloze-generated word labels. default: False", action = "store_true")
+
 
 args = parser.parse_args()
 
@@ -192,26 +196,28 @@ with zipfile.ZipFile(vgcounts_zipfilename) as azip:
 # for creating factor graphs
 print("initializing...")
 
-sds_obj = SDS(vgpath_obj)
+sds_obj = SDS(vgpath_obj, tilesize = arg.tilesize, tileovl = arg.tileovl)
 
 # read sentences, store under sentence ID
 sentid_sentence = { }
 for sentence_id, sentence in sds_obj.each_sentence_json():
     sentid_sentence[ sentence_id ] = sentence
 
-# HIER do this only when flag is set
-# read gold data
-zipfilename, filename = vgpath_obj.sds_gold()
-with zipfile.ZipFile(zipfilename) as azip:
-    with azip.open(filename) as f:
-        golddata = json.load(f)
+# read cloze wordlabels?
+if args.cloze:
+    zipfilename, filename = vgpath_obj.sds_gold()
+    with zipfile.ZipFile(zipfilename) as azip:
+        with azip.open(filename) as f:
+            golddata = json.load(f)
 
-if "cloze" not in golddata:
-    # whoops, wrong gold data?
-    raise Exception("Doing cloze evaluation, was expecting cloze info in gold data", zipfilename)
+    if "cloze" not in golddata:
+        # whoops, wrong gold data?
+        raise Exception("Was expecting cloze info in gold data", zipfilename)
 
-# dictionary of cloze words
-cloze_dict = dict( (int(wordid_s), golddata["cloze"]["words"][wordid_s]["word"]) for wordid_s in golddata["cloze"]["words"].keys())
+    # dictionary of cloze words
+    cloze_dict = dict( (int(wordid_s), golddata["cloze"]["words"][wordid_s]["word"]) for wordid_s in golddata["cloze"]["words"].keys())
+else:
+    cloze_dict = None
 
 # mapping between labels and label indices
 vgindex_obj = VgitemIndex(vgobjects_attr_rel, additional_index_obj_dict = cloze_dict)

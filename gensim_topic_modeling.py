@@ -12,17 +12,27 @@ import nltk
 import math
 import gensim
 import numpy as np
+from argparse import ArgumentParser
 
 from vgpaths import VGPaths
 
+
+parser = ArgumentParser()
+parser.add_argument('--vgdata', help="directory with VG data including frequent items, train/test split, topic model", default = "data/")
+parser.add_argument('--alpha', help="Dirichlet concentration parameter, default: 0.05", type = float, default = 0.05)
+parser.add_argument('--numtopics', help="Number of topics, default: 20", type = int, default = 20)
+args = parser.parse_args()
+
+
 vgpath_obj = VGPaths()
 
-
-# let Gensim determine best alpha value for each topic
-dirichlet_alpha = 0.05
+##
+# for now, fixing the type of alpha to 'symmetric'.
+# may want to allow the topic modeling to determine different priors
+# for different topics, but then we'll have to adapt sds.py
+# because currently  the pre-storing of Dirichlet-Multinomial probabilities
+# assumes that topics are interchangeable
 alphatype = "symmetric"
-# number of scenarios
-num_topics = 20
 
 print("reading corpus")        
 # Gensim dictionary file
@@ -42,24 +52,24 @@ with zipfile.ZipFile(zip_corpusfilename) as azip:
           
 print("training LDA model")
 ldamodel = gensim.models.ldamodel.LdaModel(corpus,
-                                           num_topics = num_topics,
+                                           num_topics = args.numtopics,
                                            id2word=gensim_dictionary, 
-                                           alpha = dirichlet_alpha,
+                                           alpha = args.alpha,
                                            passes = 10, iterations = 500, 
                                            random_state = 2, per_word_topics = True)
 
 
 ##
 # write:
-gensim_zipfilename, overall_filename, topic_filename, word_filename, topicword_filename = vgpath_obj.gensim_out_zip_and_filenames()
+gensim_zipfilename, overall_filename, topic_filename, word_filename, topicword_filename = vgpath_obj.gensim_out_zip_and_filenames(write=True)
 with zipfile.ZipFile(gensim_zipfilename, "w", zipfile.ZIP_DEFLATED) as azip:
     # Dirichlet alpha values, number of topics
-    azip.writestr(overall_filename, json.dumps( {"alpha" : dirichlet_alpha if alphatype == "symmetric" else ldamodel.alpha.tolist(),
-                                               "alphatype" : alphatype, "num_topics" : num_topics}))
+    azip.writestr(overall_filename, json.dumps( {"alpha" : args.alpha if alphatype == "symmetric" else ldamodel.alpha.tolist(),
+                                               "alphatype" : alphatype, "num_topics" : args.numtopics}))
     
     # overall characterization of each topic in terms of its 10 most likely words
     topicinfo = []
-    for topicnumber in range(num_topics):
+    for topicnumber in range(args.numtopics):
         topicinfo.append( {"topic" : topicnumber, "descr" : [ [word, prob.item()] for word, prob in ldamodel.show_topic(topicnumber)]})
     azip.writestr(topic_filename, json.dumps(topicinfo))
     

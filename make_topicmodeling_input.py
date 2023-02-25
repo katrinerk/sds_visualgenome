@@ -13,12 +13,20 @@ from collections import defaultdict, Counter
 import nltk
 import math
 import gensim
+from argparse import ArgumentParser
 
 
 from vgpaths import VGPaths
 import vgiterator
 
-vgpath_obj = VGPaths()
+
+parser = ArgumentParser()
+parser.add_argument('--vgdata', help="directory with VG data including frequent items, train/test split, topic model", default = "data/")
+parser.add_argument('--filter', help="filter extremes in topic modeling input? default: False", action = "store_true")
+args = parser.parse_args()
+
+
+vgpath_obj = VGPaths(vgdata = args.vgdata)
 
 
 vgcounts_zipfilename, vgcounts_filename = vgpath_obj.vg_counts_zip_and_filename()
@@ -34,7 +42,7 @@ with zipfile.ZipFile(split_zipfilename) as azip:
 trainset = set(traintest_split["train"])
 
 print("making iterator")
-vgobj = vgiterator.VGIterator()
+vgobj = vgiterator.VGIterator(vgcounts = vgobjects_attr_rel)
 
 ##
 # read all training images, collect objects, attributes, relations
@@ -58,16 +66,18 @@ for img, rel in vgobj.each_image_relations(img_ids = trainset):
 # make a Gensim-specific mapping from words to numeric values for our corpus
 print("making gensim dictionary")
 gensim_dictionary = gensim.corpora.Dictionary(v for v in img_contents.values())
-# gensim_dictionary.filter_extremes()
+if args.filter:
+    print("Filtering the dictionary")
+    gensim_dictionary.filter_extremes()
 
 print("writing files")
-gensimdict_zipfilename, gensimdict_filename = vgpath_obj.gensim_dict_zip_and_filename()
+gensimdict_zipfilename, gensimdict_filename = vgpath_obj.gensim_dict_zip_and_filename( write = True)
 with zipfile.ZipFile(gensimdict_zipfilename, "w", zipfile.ZIP_DEFLATED) as azip:
     azip.writestr(gensimdict_filename, pickle.dumps(gensim_dictionary))
 
 ##
 # write results to file as gensim input for topic modeling
-zip_corpusfilename = vgpath_obj.gensim_corpus_zipfilename()
+zip_corpusfilename = vgpath_obj.gensim_corpus_zipfilename(write=True)
 with zipfile.ZipFile(zip_corpusfilename, "w", zipfile.ZIP_DEFLATED) as azip:
     for img, contents in img_contents.items():
         filename = vgpath_obj.gensim_corpus_filename(img)

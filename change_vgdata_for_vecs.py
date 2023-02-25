@@ -4,24 +4,32 @@
 # for objects, attributes, relations:
 # keep only those images that are part of the training data
 
-
 import sys
 import os
 import json
 import zipfile
 from collections import defaultdict, Counter
 import random
+from argparse import ArgumentParser
 
 import vgiterator
 from vgpaths import VGPaths
 
-vgpath_obj = VGPaths()
+parser = ArgumentParser()
+parser.add_argument('output', help="directory to write modified VG output to")
+parser.add_argument('--vgdata', help="directory with VG data including frequent items, train/test split, topic model", default = "data/")
+args = parser.parse_args()
 
+
+vgpath_obj = VGPaths(vgdata = args.vgdata)
+
+# read frequent object counts
 vgcounts_zipfilename, vgcounts_filename = vgpath_obj.vg_counts_zip_and_filename()
 with zipfile.ZipFile(vgcounts_zipfilename) as azip:
     with azip.open(vgcounts_filename) as f:
         vgcounts = json.load(f)
 
+# read training/test split
 split_zipfilename, split_filename = vgpath_obj.vg_traintest_zip_and_filename()
 with zipfile.ZipFile(split_zipfilename) as azip:
     with azip.open(split_filename) as f:
@@ -29,9 +37,10 @@ with zipfile.ZipFile(split_zipfilename) as azip:
     
 trainset = set(traintest_split["train"])
 
-vg_newobjzip, vg_newattrzip, vg_newrelzip = vgpath_obj.vg_manipulated_filenames()
+# read filenames to write changed VG data to
+vg_newobjzip, vg_newattrzip, vg_newrelzip = vgpath_obj.vg_manipulated_filenames(args.output, write = True)
 
-# object file
+# read current object file 
 objects_zipfile, objects_file = vgpath_obj.vg_objects_zip_and_filename()
 new_vg_data = [ ]
 num_objects = 0
@@ -50,10 +59,11 @@ with zipfile.ZipFile(objects_zipfile) as azip:
 
 print("number of objects retained:", num_objects, "in #sentences", len(new_vg_data))
 
+# write new objects file
 with zipfile.ZipFile(vg_newobjzip, "w") as ozip:
     ozip.writestr(objects_file, json.dumps(new_vg_data))
 
-# attributes file
+# read current attributes file
 attributes_zipfile, attributes_file = vgpath_obj.vg_attributes_zip_and_filename()
 new_vg_data = [ ]
 num_attr = 0
@@ -85,11 +95,12 @@ with zipfile.ZipFile(attributes_zipfile) as azip:
                     new_vg_data.append( {'image_id' : img["image_id"],
                                         "attributes" : newattrib })
 
+# write new attributes file
 print("number of attributes retained:", num_attr, "in #sentences", len(new_vg_data))
 with zipfile.ZipFile(vg_newattrzip, "w") as ozip:
     ozip.writestr(attributes_file, json.dumps(new_vg_data))
 
-# relations
+# read original relations file
 relations_zipfile, relations_file = vgpath_obj.vg_relations_zip_and_filename()
 new_vg_data = [ ]
 num_rel = 0
@@ -118,6 +129,7 @@ with zipfile.ZipFile(relations_zipfile) as azip:
                     new_vg_data.append( {'image_id' : img["image_id"],
                                          "relationships" : newrel })
 
+# write new relations file
 print("number of relations retained:", num_rel, "in #sentences", len(new_vg_data))
 
 with zipfile.ZipFile(vg_newrelzip, "w") as ozip:

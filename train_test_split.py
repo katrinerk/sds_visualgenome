@@ -10,14 +10,27 @@ import json
 import zipfile
 from collections import defaultdict, Counter
 import random
+import configparser
+from argparse import ArgumentParser
+
 
 import vgiterator
 from vgpaths import VGPaths
 
-vgpath_obj = VGPaths()
+# where to write the output
+parser = ArgumentParser()
+parser.add_argument('--vgdata', help="directory with VG frequent-item information and train/test split", default = "data/")
+args = parser.parse_args()
+
+vgpath_obj = VGPaths(vgdata = vgdata)
 
 
-testpercentage = 0.1
+# what percentage of data is for the test set?
+config = configparser.ConfigParser()
+config.read("settings.txt")
+
+testpercentage = float(config["Parameters"]["Testpercentage"])
+
 random_seed = 78923456
 
 ##
@@ -43,7 +56,7 @@ testset = set(test_images)
 out = { "test" : sorted(test_images),
         "train" : sorted([i for i in vgitems["images"] if i not in testset]) }
 
-split_zipfilename, split_filename = vgpath_obj.vg_traintest_zip_and_filename()
+split_zipfilename, split_filename = vgpath_obj.vg_traintest_zip_and_filename(write = True)
 with zipfile.ZipFile(split_zipfilename, "w", zipfile.ZIP_DEFLATED) as azip:
     azip.writestr(split_filename, json.dumps(out, indent = 1))
     
@@ -63,7 +76,7 @@ test_attrib = Counter()
 train_rel = Counter()
 test_rel = Counter()
 
-vgobj = vgiterator.VGIterator()
+vgobj = vgiterator.VGIterator(vgcounts = vgitems)
 
 # object counts
 for img, frequent_objects in vgobj.each_image_objects():

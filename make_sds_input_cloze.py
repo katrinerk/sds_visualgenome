@@ -10,10 +10,10 @@ import os
 import json
 import zipfile
 from collections import defaultdict, Counter
-import nltk
 import math
 import numpy as np
 import random
+from argparse import ArgumentParser
 
 import vgiterator
 from sds_input_util import VGSentences, VGParam
@@ -22,22 +22,33 @@ from vgpaths import VGPaths
 
 
 ########3
-# show histograms of object label counts?
-show_stats = False
+
+parser = ArgumentParser()
+parser.add_argument('--output', help="directory to write output to, default: sds_in/cloze", default = "sds_in/cloze/")
+parser.add_argument('--vgdata', help="directory with VG data including frequent items, train/test split, topic model", default = "data/")
+parser.add_argument('--pairs_per_bin', help="Number of cloze pairs to sample per bin, default 20", type = int, default = 1)
+parser.add_argument('--sents_per_pair', help="Number of sentences per cloze pair, default 50", type = int, default = 50)
+parser.add_argument('--bins', help="Bins, given as string of comma-separated nubers, default '65,100,220,750,100000'", default = "65,100,220,750,100000")
+parser.add_argument('--scen_per_concept', help="Number of top scenarios to record for a concept, default 5", type = int, default = 5)
+
+args = parser.parse_args()
+
+
+vgpath_obj = VGPaths(vgdata = args.vgdata, sdsdata = args.output)
 
 # use target words only when they occur
 # as arguments of a predicate?
 target_needs_to_be_argument = True
 
 # frequency bins from which to sample target words
-bins = [ (0, 65), (65, 100), (100, 220), (220, 750), (750, 1000000)]
+bin_ends = [int(b) for b in args.bins.split(",")]
+bin_start = 0
+bins = [ ]
+for b in bin_ends:
+    bins.append( (bin_start, b) )
+    bin_start = b
 
-# how many cloze word pairs to sample per frequency bin? 
-pairs_per_bin = 1
-
-# maximum number of sentences per cloze pair
-# set to None to use all
-max_sentences_per_clozepair = 50
+print("Bins:", bins)
 
 ##################
 # read data
@@ -122,11 +133,11 @@ testobject_ids = set()
 
 for frequencybin, objects in bin_objects.items():
     # randomly select objects
-    if len(objects) < 2 * pairs_per_bin:
+    if len(objects) < 2 * args.pairs_per_bin:
         print("too few objects in bin", frequencybin, "choosing all", len(objects))
         chosen_objects = objects
     else:
-        chosen_objects = random.sample(objects, k= 2* pairs_per_bin)
+        chosen_objects = random.sample(objects, k= 2* args.pairs_per_bin)
 
     # make object pairs,
     # record in gold
@@ -175,7 +186,7 @@ for frequencybin, objects in bin_objects.items():
 
 print("writing SDS parameters")
     
-vgparam_obj = VGParam(vgpath_obj)
+vgparam_obj = VGParam(vgpath_obj, top_scenarios_per_concept = args.scen_per_concept)
 global_param, scenario_concept_param, word_concept_param, selpref_param = vgparam_obj.get()
 
 # record the extra words we got
@@ -272,10 +283,10 @@ sentid_clozeids = defaultdict(list)
 
 for clozeid, sentences in clozeid_sent.items():
     
-    if max_sentences_per_clozepair is not None:
+    if args.sents_per_pair is not None:
         # we are downsampling
-        if len(sentences) > max_sentences_per_clozepair:
-            sentences = random.sample(sentences, max_sentences_per_clozepair)
+        if len(sentences) > args.sents_per_pair:
+            sentences = random.sample(sentences, args.sents_per_pair)
 
     # store how many occurrences of the cloze word we have
     gold["cloze"]["words"][clozeid]["occurrences"] = len(sentences)
@@ -350,10 +361,10 @@ vgsent_obj.write(sentences)
 
 ###
 # write gold information
-gold_zipfile, gold_file = vgpath_obj.sds_gold()
+gold_zipfile, gold_file = vgpath_obj.sds_gold( write = True)
 with zipfile.ZipFile(gold_zipfile, "w", zipfile.ZIP_DEFLATED) as azip:
     azip.writestr(gold_file, json.dumps(gold))
 
 # output info on cloze words to screen
 for clozeinfo in gold["cloze"]["words"].values():
-    print(clozeinfo["labels"][0], ", ", clozeinfo["labels"][1], ", num sentences", clozeinfo["occurrences"])
+    print(clozeinfo["labels"][0], ", ", clozeinfo["labels"][1], " num sentences", clozeinfo["occurrences"])

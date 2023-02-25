@@ -10,35 +10,37 @@ import os
 import json
 import zipfile
 from collections import defaultdict, Counter
-import nltk
-import math
 import numpy as np
 import random
+from argparse import ArgumentParser
 
 import vgiterator
 from sds_input_util import VGSentences, VGParam
 from vgindex import VgitemIndex
 from vgpaths import VGPaths
 
-num_testsentences = 100
-max_num_objects_tokeep = 25
-shortsentence_fraction_test = 0.3
-
 ##################
 # read data
 
-vgpath_obj = VGPaths(sdsdata = "sds_in/imagine_scen")
+parser = ArgumentParser()
+parser.add_argument('--output', help="directory to write output to, default: sds_in/imagine_scen", default = "sds_in/imagine_scen/")
+parser.add_argument('--vgdata', help="directory with VG data including frequent items, train/test split, topic model", default = "data/")
+parser.add_argument('--numsent', help="number of sentences to sample for evaluation, default 1000", type = int, default = 100)
+parser.add_argument('--maxobj', help="maximum number of objects per sentence to retain, default 25", type = int, default = 25)
+parser.add_argument('--testfrac', help"for short sentences, fraction of objects to use for testing, default 0.3", type = float, default = 0.3)
+parser.add_argument('--scen_per_concept', help="Number of top scenarios to record for a concept, default 5", type = int, default = 5)
+
+
+vgpath_obj = VGPaths(vgdata = args.vgdata, sdsdata = args.output)
 
 # read frequent objects, attributes, relations
 vgcounts_zipfilename, vgcounts_filename = vgpath_obj.vg_counts_zip_and_filename()
 with zipfile.ZipFile(vgcounts_zipfilename) as azip:
     with azip.open(vgcounts_filename) as f:
         vgobjects_attr_rel = json.load(f)
-vgindex_obj = VgitemIndex(vgobjects_attr_rel)
 
 
 # obtain IDs of training and test images
-
 split_zipfilename, split_filename = vgpath_obj.vg_traintest_zip_and_filename()
 with zipfile.ZipFile(split_zipfilename) as azip:
     with azip.open(split_filename) as f:
@@ -46,7 +48,8 @@ with zipfile.ZipFile(split_zipfilename) as azip:
     
 trainset = set(traintest_split["train"])
 
-vgobj = vgiterator.VGIterator()
+vgindex_obj = VgitemIndex(vgobjects_attr_rel)
+vgobj = vgiterator.VGIterator(vgcounts = vgobjects_attr_rel)
 
 random.seed(6543)
 
@@ -59,7 +62,7 @@ random.seed(6543)
 
 print("writing SDS parameters")
     
-vgparam_obj = VGParam(vgpath_obj)
+vgparam_obj = VGParam(vgpath_obj, top_scenarios_per_concept = args.scen_per_concept))
 global_param, scenario_concept_param, word_concept_param, selpref_param = vgparam_obj.get()
 vgparam_obj.write(global_param, scenario_concept_param, word_concept_param, selpref_param)
 
@@ -69,8 +72,8 @@ vgparam_obj.write(global_param, scenario_concept_param, word_concept_param, selp
 #
 # transform sentences:
 # for each test sentence, hide
-# shortsentence_fraction_test of the objects (for short sentences)
-# or all objects beyond max_num_objects_tokeep
+# args.testfrac of the objects (for short sentences)
+# or all objects beyond args.maxobj
 
 print("Writing sentences")
 
@@ -84,7 +87,7 @@ for sentid, words, roles in vgsent_obj.each_testsentence(vgobj, vgobjects_attr_r
 
 
 # randomly select test sentences
-testsentences = random.sample(sentences, num_testsentences)
+testsentences = random.sample(sentences, args.numsent)
 
 # hide some objects in each test sentence,
 # store in gold object what we hid
@@ -97,7 +100,7 @@ for sentid, words, roles in testsentences:
     # as we are only downsampling those
     object_literals = [ (w, labelid, dref) for w, labelid, dref in words if vgindex_obj.ix2l(labelid)[1] == "obj"]
 
-    num_to_remove = len(object_literals) - max_num_objects_tokeep if len(object_literals) > max_num_objects_tokeep else int(len(object_literals) * shortsentence_fraction_test)
+    num_to_remove = len(object_literals) - args.maxobj if len(object_literals) > args.maxobj else int(len(object_literals) * args.testfrac)
 
     if num_to_remove == 0:
         # nothing left to remove, don't use this sentence
@@ -121,7 +124,7 @@ vgsent_obj.write(testsentences_transformed)
 
 ###
 # write gold information
-gold_zipfile, gold_file = vgpath_obj.sds_gold()
+gold_zipfile, gold_file = vgpath_obj.sds_gold( write= True)
 with zipfile.ZipFile(gold_zipfile, "w", zipfile.ZIP_DEFLATED) as azip:
     azip.writestr(gold_file, json.dumps(gold))
 

@@ -8,30 +8,35 @@ import os
 import json
 import zipfile
 from collections import defaultdict, Counter
-import nltk
 import math
 import numpy as np
 import random
-import statistics
+from argparse import ArgumentParser
 
 import vgiterator
 import sentence_util
 from vgindex import VgitemIndex
-from vgpaths import VGPaths
+from vgpaths import VGPaths, get_output_path
 
 ########3
 # settings
-# number of sentences to inspect at random
-num_sentences_to_inspect = 10
 
-outdir = "inspect_output/imagine_scen"
 
+parser = ArgumentParser()
+parser.add_argument('--sdsinput', help="directory with input to sds, default: sds_in/imagine_scen", default = "sds_in/imagine_scen/")
+parser.add_argument('--sdsoutput', help="directory with sds output, default: sds_out/imagine_scen", default = "sds_out/imagine_scen/")
+parser.add_argument('--outdir', help="directory to write output for inspection, default: inspect_output/imagine_scen", default = "inspect_output/imagine_scen/")
+parser.add_argument('--vgdata', help="directory with VG data including frequent items, train/test split, topic model", default = "data/")
+parser.add_argument('--numsent_inspect', help = "number of sentences to write for inspection, default 10", type = int, default = 10)
+
+args = parser.parse_args()
 
 ########3
 print("Reading data")
+vgpath_obj = VGPaths(sdsdata = args.sdsinput, sdsout =  args.sdsoutput, vgdata = args.vgdata)
 
-vgpath_obj = VGPaths(sdsdata = "sds_in/imagine_scen/", sdsout =  "sds_out/imagine_scen/")
 
+# frequent objects, attributes, relations
 vgcounts_zipfilename, vgcounts_filename = vgpath_obj.vg_counts_zip_and_filename()
 with zipfile.ZipFile(vgcounts_zipfilename) as azip:
     with azip.open(vgcounts_filename) as f:
@@ -228,10 +233,11 @@ sentid_averageprecision = { }
 sentid_highestcorrect = { }
 
 # which sentences to sample for inspection?
-sentence_ids_to_inspect = random.sample(list(sentid_sent.keys()), num_sentences_to_inspect)
+sentence_ids_to_inspect = random.sample(list(sentid_sent.keys()), args.numsent_inspect)
 
 # loop over files, evaluate, write inspection files
-with open(os.path.join(outdir, "eval_imagine_scen_out.txt"), "w") as outf:
+outpath = get_output_path(os.path.join(args.outdir, "eval_imagine_scen_out.txt"))
+with open(outpath, "w") as outf:
 
     out_obj = sentence_util.SentencePrinter(vgindex_obj, file = outf)
     

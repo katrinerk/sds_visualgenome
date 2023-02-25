@@ -8,10 +8,24 @@ import json
 import zipfile
 import nltk
 from collections import defaultdict, Counter
+import configparser
+from argparse import ArgumentParser
 
 from vgpaths import VGPaths
 
-vgpath_obj = VGPaths()
+##
+# initialize, read global parameters
+
+# where to write the output
+parser = ArgumentParser()
+parser.add_argument('--vgdata', help="directory where to write frequent-item information", default = "data/")
+args = parser.parse_args()
+
+vgpath_obj = VGPaths(vgdata = args.vgdata)
+
+# cutoffs for frequent objects, attributes, relations
+config = configparser.ConfigParser()
+config.read("settings.txt")
 
 ##
 # images to use:
@@ -37,8 +51,7 @@ for img in vg_data:
         for label in obj["names"]:
             objectcount[ label] += 1
 
-cutoff = 50
-freq_objects = set([s for s in objectcount if objectcount[s] >= cutoff])
+freq_objects = set([s for s in objectcount if objectcount[s] >= int(config["Parameters"]["VGFreqCutoffObj"])])
 print("num of frequent objects:", len(freq_objects))
 print()
 
@@ -50,7 +63,7 @@ for word, freq in objectcount.most_common(20):
 print()
 print("lower end")
 
-print([s for s in objectcount if objectcount[s] == cutoff])
+print([s for s in objectcount if objectcount[s] == int(config["Parameters"]["VGFreqCutoffObj"])])
 print()
 
 ##
@@ -88,8 +101,7 @@ for img in vg_data:
             for attr in entry["attributes"]:
                 attrcount[ attr ]  += 1
 
-cutoff = 50
-freqattr = set([a for a in attrcount if attrcount[a] >= cutoff])
+freqattr = set([a for a in attrcount if attrcount[a] >= int(config["Parameters"]["VGFreqCutoffAtt"])])
 print("num of frequent attributes", len(freqattr))
 print()
 
@@ -102,7 +114,7 @@ for word, freq in attrcount.most_common(20):
 print()
 print("lower end")
 
-print([s for s in attrcount if attrcount[s] == cutoff])
+print([s for s in attrcount if attrcount[s] == int(config["Parameters"]["VGFreqCutoffAtt"])])
 print()
 
 ##
@@ -137,8 +149,7 @@ for img in vg_data:
           # one of the labels of the object is a frequent word
             relcount[ entry["predicate"] ] += 1
 
-cutoff = 50
-freqrel = set([a for a in relcount if relcount[a] >= cutoff])
+freqrel = set([a for a in relcount if relcount[a] >= int(config["Parameters"]["VGFreqCutoffRel"])])
 print("num of frequent relations", len(freqrel))
 print()
 
@@ -151,7 +162,7 @@ for word, freq in relcount.most_common(20):
 print()
 print("lower end")
 
-print([s for s in relcount if relcount[s] == cutoff])
+print([s for s in relcount if relcount[s] == int(config["Parameters"]["VGFreqCutoffRel"])])
 print()
 
 
@@ -163,7 +174,7 @@ out = { "objects" : sorted(list(freq_objects)),
         "images" : sorted(list(good_images)),
         "image_objid" : image_objid}
 
-vgcounts_zipfilename, vgcounts_filename = vgpath_obj.vg_counts_zip_and_filename()
+vgcounts_zipfilename, vgcounts_filename = vgpath_obj.vg_counts_zip_and_filename(write=True)
 with zipfile.ZipFile(vgcounts_zipfilename, "w", zipfile.ZIP_DEFLATED) as azip:
     azip.writestr(vgcounts_filename, json.dumps(out, indent = 1))
 

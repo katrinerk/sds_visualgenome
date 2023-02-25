@@ -8,31 +8,37 @@ import os
 import json
 import zipfile
 from collections import defaultdict, Counter
-import nltk
-import math
 import numpy as np
-import random
-import statistics
+from argparse import ArgumentParser
 
 import vgiterator
 from sds_input_util import VGSentences, VGParam
 import sentence_util
 from vgindex import VgitemIndex
-from vgpaths import VGPaths
+from vgpaths import VGPaths, get_output_path
 
 ########
-outdir = "inspect_output/cloze"
+
+parser = ArgumentParser()
+parser.add_argument('--sdsinput', help="directory with input to sds, default: sds_in/cloze", default = "sds_in/cloze/")
+parser.add_argument('--sdsoutput', help="directory with sds output, default: sds_out/cloze", default = "sds_out/cloze/")
+parser.add_argument('--outdir', help="directory to write output for inspection, default: inspect_output/cloze", default = "inspect_output/cloze/")
+parser.add_argument('--vgdata', help="directory with VG data including frequent items, train/test split, topic model", default = "data/")
+
+args = parser.parse_args()
+
 
 ########3
 
-vgpath_obj = VGPaths(sdsdata = "sds_in/cloze/", sdsout =  "sds_out/cloze/")
+vgpath_obj = VGPaths(sdsdata = args.sdsinput, sdsout =  args.sdsoutput, vgdata = args.vgdata)
 
+# read frequent object counts
 vgcounts_zipfilename, vgcounts_filename = vgpath_obj.vg_counts_zip_and_filename()
 with zipfile.ZipFile(vgcounts_zipfilename) as azip:
     with azip.open(vgcounts_filename) as f:
         vgobjects_attr_rel = json.load(f)
 
-# read gold data
+# read cloze gold data
 zipfilename, filename = vgpath_obj.sds_gold()
 with zipfile.ZipFile(zipfilename) as azip:
     with azip.open(filename) as f:
@@ -163,7 +169,7 @@ for clozeword_id in clozeword_model_acc.keys():
 
     ########
     # store file under the name of the cloze word
-    filename = os.path.join(outdir, clozeword + ".txt")
+    path = get_output_path(os.path.join(args.outdir, clozeword + ".txt"))
 
     with open(filename, "w") as outf:
         out_obj = sentence_util.SentencePrinter(vgindex_obj, file = outf)

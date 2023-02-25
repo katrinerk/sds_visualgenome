@@ -78,13 +78,17 @@ class DirMultStore:
 ################################
 ################################
 class SDS:
-    def __init__(self, vgpath_obj):
+    def __init__(self, vgpath_obj, tilesize = 6, tileovl = 2):
         self.vgpath_obj = vgpath_obj
         
         self.param_general, self.param_selpref, self.param_scenario_concept, self.param_word_concept = self.read_parameters(vgpath_obj)
 
         # keep previously computed Dirichlet Multinomial log probabilities
         self.dirmult_obj = DirMultStore(self.param_general["dirichlet_alpha"], self.param_general["num_scenarios"])
+
+        self.tilesize = tilesize
+        self.tileovl = tileovl
+        
         
     ########################3
     # read global parameters,
@@ -236,7 +240,7 @@ class SDS:
 
         # across all scenarios, a factor (or constellation of factors)
         # to implement the Dirichlet Multinomial distribution
-        self.constrain_scenarios(fg, scenario_variables, num_nodes, conceptvar_concepts)
+        self.constrain_scenarios(fg, scenario_variables, num_nodes, conceptvar_concepts, tilesize = tilesize, tileovl = tileovl)
 
         ###
         # finalize graph
@@ -371,18 +375,17 @@ class SDS:
 
     ##########
     # Dirichlet-Multinomial as constraint on co-occurrences of scenarios
-    def constrain_scenarios(self, fg, scenario_variables, num_nodes, conceptvar_concepts,
-                            tilesize = 6, overlap = 2):
+    def constrain_scenarios(self, fg, scenario_variables, num_nodes, conceptvar_concepts):
 
         # only one scenario? nothing to constrain
         if self.param_general["num_scenarios"] < 2:
             return
 
         # "tiling" scenario constraints:
-        # we are only constraining `tilesize` scenarios at a time,
-        # with an overlap of `overlap`
-        tile_start_indices = list(range(0, num_nodes, tilesize - overlap))
-        if len(tile_start_indices) > 1 and num_nodes - tile_start_indices[-1] <= overlap:
+        # we are only constraining `self.tilesize` scenarios at a time,
+        # with an overlap of `self.tileovl`
+        tile_start_indices = list(range(0, num_nodes, self.tilesize - self.tileovl))
+        if len(tile_start_indices) > 1 and num_nodes - tile_start_indices[-1] <= self.tileovl:
             # we have at least two tiles, but the last one would be shorter than the overlap
             # so it's completely covered by the next-to-last tile
             # so delete the last tile
@@ -397,7 +400,7 @@ class SDS:
                 endindex = num_nodes - 1
             else:
                 # not last tile
-                endindex = startindex + tilesize
+                endindex = startindex + self.tilesize
 
             # mutually constrain scenarios from startindex to endindex
 
@@ -429,18 +432,21 @@ def main():
     parser = ArgumentParser()
     parser.add_argument('input', help="directory with input sentences")
     parser.add_argument('output', help="directory for system output")
+    parser.add_argument('--tilesize', help="Scenario tiling: number of scenarios restricted by one Dir-Mult factor, default: 6", type = int, default = 6)
+    parser.add_argument('--tileovl', help="Scenario tiling: overlap between tiles, default: 2", type = int, default = 2)
+    
 
     args = parser.parse_args()
 
     vgpath_obj = VGPaths(sdsdata = args.input, sdsout = args.output)
 
     # make SDS object
-    sds_obj = SDS(vgpath_obj)
+    sds_obj = SDS(vgpath_obj, tilesize = arg.tilesize, tileovl = arg.tileovl)
 
     # process each utterance go through utterances in the input file,
     sentlength_runtime = defaultdict(list)
 
-    # counter only for testing
+    # counter for progress bar
     counter = 0
 
     # store MAP results and marginals
@@ -476,7 +482,7 @@ def main():
 
     # write results
     # into the output zip file
-    zipfilename, filename = vgpath_obj.sds_output_zipfilename()
+    zipfilename, filename = vgpath_obj.sds_output_zipfilename( write = True)
     with zipfile.ZipFile(zipfilename, "w", zipfile.ZIP_DEFLATED) as azip:
         azip.writestr(filename, json.dumps(results))
 
