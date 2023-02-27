@@ -19,7 +19,8 @@ from scipy import stats
 import vgiterator
 import sentence_util
 from vgindex import VgitemIndex
-from vgpaths import VGPaths
+from vgpaths import VGPaths, get_output_path
+from vec_util import VectorInterface
 
 # TO ADD: output for inspection
 
@@ -29,11 +30,13 @@ from vgpaths import VGPaths
 
 
 parser = ArgumentParser()
-# parser.add_argument('--outdir', help="directory to write output for inspection, default: inspect_output/imagine_att", default = "inspect_output/imagine_att/")
+parser.add_argument('--outdir', help="directory to write output for inspection, default: inspect_output/imagine_att", default = "inspect_output/imagine_att/")
 parser.add_argument('--vgdata', help="directory with VG data including frequent items, train/test split, topic model", default = "data/")
 parser.add_argument('--trainperc', help = "percentage of object types to use for training PLSR, default 0.8", type = float, default = 0.8)
 parser.add_argument('--num_att', help = "number of top attributes to use, default 300", type = int, default = 300)
 parser.add_argument('--plsr_components', help = "number of components to use for PLSR, default 20", type = int, default = 20)
+parser.add_argument('--num_inspeplsr_components', help = "number of components to use for PLSR, default 20", type = int, default = 20)
+parser.add_argument('--num_inspect', help = "number of objects to write for inspection, default 10", type = int, default = 10)
 
 args = parser.parse_args()
 
@@ -126,35 +129,16 @@ for obj in obj_att_count.keys():
 
 ###
 # read vectors
-vecfilename = vgpath_obj.vg_vecfilename()
-object_vec = { }
+vec_obj = VectorInterface(vgpath_obj)
 
-with open(vecfilename) as f:
-    for line in f:
-        pieces = line.split()
-        # first word is label
-        label = pieces[0]
-        # from what I can see, vectors for attributes have no .n at the end,
-        # and vectors for relations are actually for relation-argument pairs,
-        # and always have parentheses.
-        # what are they for?
-        #
-        # determine vectors for objects:
-        # remove .n
-        # and turn underscores to spaces
-        if label.endswith(".n") and "(" not in label and ")" not in label:
-            label = label[:-2]
-            label = label.replace("_", " ")
-            object_vec[ label ] = [ float(v) for v in pieces[1:]]
+# how many vectors are missing?
+missing = 0
+for obj in training_objectlabels:
+    if obj not in vec_obj.object_vec:
+        missing += 1
 
-
-# # # do we have vectors for all objects?
-# print("No entry for:")
-# for obj in training_objectlabels:
-#     if obj not in object_vec:
-#         print(obj, end = ", ")
-# print()
-
+if missing > 0:
+    print("Missing vectors for", missing, "out of", len(training_objectlabels), "objects")
 
 # for the objects where we have vectors, make data structures
 # for input into Partial Least Squares regression
@@ -186,6 +170,28 @@ Ypredict_train = pls_obj.predict(Xtrain)
 
 # prediction for test objects
 Ypredict_test = pls_obj.predict(Xtest)
+
+
+##
+# write output for inspection:
+# several objects from the test portion, with gold and predicted features
+outpath = get_output_path(os.path.join(args.outdir, "eval_imagine_att_out.txt"))
+inspect_objectindices = random.sample(list(range(len(used_test_object_labelds))), args.num_inspect)
+with open(outpath, "w") as outf:
+    for objix in inspect_objectlabels:
+        objlabel = used_test_object_labels[objix]
+        
+        print("-----------\nObject:", objlabel, "\n", file = outf)
+        
+        print("Gold:", file = outf)
+        for a, p in sorted(object_att_prob[objlabel].items(), key = lambda p:p[1], reverse = True):
+            print("\t", a, ":", p, file = outf)
+        print(file = outf)
+        
+        print("Predicted:", file = outf)
+        att_pred = zip(use_attributelabels, Ypredict_test[objix])
+        for a, p in sorted(att_pred, key = lambda p:p[1], reverse = True):
+            print("\t", a, ":", p, file = outf)
 
 #########3
 print("Evaluating")
@@ -312,3 +318,6 @@ vals = [r for ix, r in enumerate(base_ranking_of_true_attrib) if not obj_is_trai
 print("Baseline, test objects:", round(sum(vals) / len(vals), 3))
 
 
+        
+        
+    

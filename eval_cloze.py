@@ -169,9 +169,9 @@ for clozeword_id in clozeword_model_acc.keys():
 
     ########
     # store file under the name of the cloze word
-    path = get_output_path(os.path.join(args.outdir, clozeword + ".txt"))
+    outpath = get_output_path(os.path.join(args.outdir, clozeword + ".txt"), overwrite_warning = False)
 
-    with open(filename, "w") as outf:
+    with open(outpath, "w") as outf:
         out_obj = sentence_util.SentencePrinter(vgindex_obj, file = outf)
         
         print("Cloze word ", clozeword, ". Concepts: ", concepts[0], " (freq ", freq[0], "), ", concepts[1], " (freq ", freq[1], ")", sep='', file = outf)

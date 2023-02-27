@@ -19,12 +19,17 @@ import random
 
 import vgiterator
 from vgindex import VgitemIndex
+from vec_util import VectorInterface
 
 #############
 # class for reading data for SDS parameters
 class VGParam:
     # read initial data
-    def __init__(self, vgpath_obj, top_scenarios_per_concept = 5, frequentobj = None):
+    # top scenarios per concept: only this many scenarios per concept will be listed
+    # frequentobj: counts of frequent objects, attributes, relations, will be read from file if not given
+    # selpref_vectors: if True, compute selectional preferences using vectors rather than observed
+    #   relative frequencies
+    def __init__(self, vgpath_obj, top_scenarios_per_concept = 5, frequentobj = None, selpref_vectors = True):
         # object with paths to VG data
         self.vgpath_obj = vgpath_obj
 
@@ -50,6 +55,10 @@ class VGParam:
     
         self.trainset = set(traintest_split["train"])
         self.testset = set(traintest_split["test"])
+
+        # read vectors?
+        self.selpref_vectors = selpref_vectors
+        self.vec_obj = VectorInterface(self.vgpath_obj) if self.selpref_vectors else None
 
     # obtain data and return it:
     # * global parameters
@@ -180,6 +189,19 @@ class VGParam:
                 for l in img_objid_label[imgid][objid]:
                     rel_count_obj[predname][l] += 1
 
+        if self.selpref_vectors:
+            selpref_json = self.compute_selpref_vectors(attr_count, rel_count_subj, rel_count_obj)
+        else:
+            selpref_json = self.compute_selpref_relfreq(attr_count, rel_count_subj, rel_count_obj)
+
+        retv.append(selpref_json)
+
+        return retv
+
+    ####
+    # compute selectional preferences as relative frequency, return as dictionary
+    # arg0/arg1 -> dictionary with entries "config": list of arguments, "weight": list of matching weights
+    def compute_selpref_relfreq(self, attr_count, rel_count_subj, rel_count_obj):
         selpref_json = { "arg0" : {"config" : [], "weight" : []},
                          "arg1" :  {"config" : [], "weight" : [] } }
 
@@ -201,10 +223,46 @@ class VGParam:
                     selpref_json[label]["config"].append( (predix, self.vgindex.o2ix(arg)) )
                     selpref_json[label]["weight"].append( math.log(count) - normalizer)
 
-        retv.append(selpref_json)
+        return selpref_json
 
-        return retv
+    ####
+    # compute selectional preferences as similarity to centroid vector, return as dictionary
+    # arg0/arg1 -> dictionary with entries "config": list of arguments, "weight": list of matching weights
+    def compute_selpref_vectors(self, attr_count, rel_count_subj, rel_count_obj):
+        selpref_json = { "arg0" : {"config" : [], "weight" : []},
+                         "arg1" :  {"config" : [], "weight" : [] } }
 
+        # store attribute/argument pairs and their weights,
+        # rel/subj pairs, rel/obj pairs
+        for cfd, predtype, label in [ (attr_count, "attr", "arg1"), (rel_count_subj, "rel", "arg0"), (rel_count_obj, "rel", "arg1")]:
+            for pred in cfd.conditions():
+                # predicate index for this predicate
+                if predtype == "attr":
+                    predix = self.vgindex.a2ix(pred)
+                    if predix is None:
+                        print("no index found for attrib", pred)
+                else:
+                    predix= self.vgindex.r2ix(pred)
+                    if predix is None:
+                        print("no index found for rel", pred)
+
+                # compute centroid
+                objectlabels_and_sims = self.vec_obj.all_objects_sim_centroid(list(cfd[pred].keys()))
+
+                # centroid was zero, nothing to be done for this predicate
+                if objectlabels_and_sims is None:
+                    continue
+
+                for arg, sim in objectlabels_and_sims:
+                    if sim > 0:
+                        selpref_json[label]["config"].append( (predix, self.vgindex.o2ix(arg)))
+                        selpref_json[label]["weight"].append( sim**10)
+                
+        return selpref_json
+                    
+
+    #####
+    # write parameters to files
     def write(self, global_param, concept_scenario, word_concept, selpref_json):
 
         ##
@@ -234,6 +292,7 @@ class VGParam:
         with zipfile.ZipFile(selpref_zipfile, "w", zipfile.ZIP_DEFLATED) as azip:
             azip.writestr(selpref_file, json.dumps(selpref_json))
 
+##############################
 class VGSentences:
     def __init__(self, vgpath_obj):
         self.vgpath_obj = vgpath_obj

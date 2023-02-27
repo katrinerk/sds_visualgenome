@@ -26,12 +26,15 @@ from vgpaths import VGPaths
 parser = ArgumentParser()
 parser.add_argument('--output', help="directory to write output to, default: sds_in/cloze", default = "sds_in/cloze/")
 parser.add_argument('--vgdata', help="directory with VG data including frequent items, train/test split, topic model", default = "data/")
+parser.add_argument('--selpref_relfreq', help="selectional preferences using relative frequency rather than similarity to centroid?  default: False", action = "store_true")
 parser.add_argument('--pairs_per_bin', help="Number of cloze pairs to sample per bin, default 20", type = int, default = 1)
-parser.add_argument('--sents_per_pair', help="Number of sentences per cloze pair, default 50", type = int, default = 50)
+parser.add_argument('--numsent', help="Number of sentences per cloze pair, default 50", type = int, default = 50)
 parser.add_argument('--bins', help="Bins, given as string of comma-separated nubers, default '65,100,220,750,100000'", default = "65,100,220,750,100000")
 parser.add_argument('--scen_per_concept', help="Number of top scenarios to record for a concept, default 5", type = int, default = 5)
 
 args = parser.parse_args()
+
+print("Using embeddings to compute selectional constraints?", not(args.selpref_relfreq))
 
 
 vgpath_obj = VGPaths(vgdata = args.vgdata, sdsdata = args.output)
@@ -186,7 +189,8 @@ for frequencybin, objects in bin_objects.items():
 
 print("writing SDS parameters")
     
-vgparam_obj = VGParam(vgpath_obj, top_scenarios_per_concept = args.scen_per_concept)
+vgparam_obj = VGParam(vgpath_obj, top_scenarios_per_concept = args.scen_per_concept, selpref_vectors = not(args.selpref_relfreq))
+
 global_param, scenario_concept_param, word_concept_param, selpref_param = vgparam_obj.get()
 
 # record the extra words we got
@@ -283,10 +287,10 @@ sentid_clozeids = defaultdict(list)
 
 for clozeid, sentences in clozeid_sent.items():
     
-    if args.sents_per_pair is not None:
+    if args.numsent is not None:
         # we are downsampling
-        if len(sentences) > args.sents_per_pair:
-            sentences = random.sample(sentences, args.sents_per_pair)
+        if len(sentences) > args.numsent:
+            sentences = random.sample(sentences, args.numsent)
 
     # store how many occurrences of the cloze word we have
     gold["cloze"]["words"][clozeid]["occurrences"] = len(sentences)

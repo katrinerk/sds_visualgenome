@@ -229,18 +229,17 @@ class SDS:
         concept_variables, scenario_variables, = self.make_concept_and_scenario_vars(fg, num_nodes)
 
         # for each concept, a factor that restricts its values according to the word
-        # Currently, no ambiguity!
         conceptvar_concepts, conceptvar_indices = self.constrain_concepts_bywords(fg, concept_variables, wordliterals)
 
         # for each scenario/concept pair, a factor that restricts co-occurrences
         self.constrain_scenarios_concepts(fg, conceptvar_concepts, concept_variables, scenario_variables)
 
         # for each role, a factor that implements selectional constraints
-        self.constrain_roles(fg, concept_variables, conceptvar_indices, roleliterals)
+        self.constrain_roles(fg, concept_variables, conceptvar_concepts, conceptvar_indices, roleliterals)
 
         # across all scenarios, a factor (or constellation of factors)
         # to implement the Dirichlet Multinomial distribution
-        self.constrain_scenarios(fg, scenario_variables, num_nodes, conceptvar_concepts, tilesize = tilesize, tileovl = tileovl)
+        self.constrain_scenarios(fg, scenario_variables, num_nodes, conceptvar_concepts)
 
         ###
         # finalize graph
@@ -278,8 +277,6 @@ class SDS:
                 # we do have an entry for this word.
                 # concept indices may differ from the word index
                 concept_indices = [int(c) for c in self.param_word_concept[wordkey].keys()]
-                if len(concept_indices) > 2:
-                    print("HIER", concept_indices)
 
                 # store concept indices for this word
                 conceptvar_concepts.append( concept_indices)
@@ -288,8 +285,8 @@ class SDS:
                 # configurations: all relevant concept indices.
                 # log probabilities: as stored for these concept indices in the parameter dictionary
                 fg.add_factor(variables = [ concept_variables[i] ],
-                         factor_configs = np.array([ [c] for c in concept_indices]),
-                         log_potentials = np.array([ self.param_word_concept[wordkey][str(c)] for c in concept_indices]))
+                         factor_configs = np.array([ [c] for c in concept_indices], dtype = int),
+                         log_potentials = np.array([ self.param_word_concept[wordkey][str(c)] for c in concept_indices], dtype = np.float64))
 
             else:
                 # concept index is same as word index
@@ -301,7 +298,7 @@ class SDS:
 
                 # make factor: just one possible concept, with probability 1
                 fg.add_factor(variables = [ concept_variables[i] ],
-                         factor_configs = np.array([ [conceptindex] ]))
+                         factor_configs = np.array([ [conceptindex] ], dtype = int))
 
             # store the discourse referent from the current literal
             # as going with this concept-valued variable
@@ -336,8 +333,8 @@ class SDS:
                 logprobs.append(weight)
 
         fg.add_factor_group(variable_groups = [ [scenario_variables[i], concept_variables[i]] for i in range(num_nodes)],
-                            factor_configs = np.array(valid_configs),
-                            log_potentials = np.array(logprobs))
+                            factor_configs = np.array(valid_configs, dtype = int),
+                            log_potentials = np.array(logprobs, dtype = np.float64))
 
         # print("constraint-scenario factors on", [ [scenario_variables[i], concept_variables[i]] for i in range(num_nodes)])
 
@@ -345,8 +342,11 @@ class SDS:
 
     ##########
     # add a factor restricting the concepts at dependent-index
-    def constrain_roles(self, fg, concept_variables, conceptvar_dref, roleliterals):
+    def constrain_roles(self, fg, concept_variables, conceptvar_concepts, conceptvar_dref, roleliterals):
 
+        # flatten conceptvar_concepts into a single set
+        concepts_this_sent = set(item for sublist in conceptvar_concepts for item in sublist)
+        
         # for every type of role, add factor group
         for roletype in self.param_selpref.keys():
             # collect pairs of concept index for predicate, concept index for argument.
@@ -365,9 +365,21 @@ class SDS:
                         variable_pairs.append( (hix, dix))
 
             if len(variable_pairs) > 0:
+                factor_configs = [ ]
+                log_potentials = [ ]
+                for config, logp in zip(self.param_selpref[roletype]["config"], self.param_selpref[roletype]["weight"]):
+                    if config[0] in concepts_this_sent and config[1] in concepts_this_sent:
+                        factor_configs.append(config)
+                        log_potentials.append(logp)
+
+                
                 fg.add_factor_group(variable_groups = [ [concept_variables[i], concept_variables[j]]  for i, j in variable_pairs],
-                                    factor_configs = np.array(self.param_selpref[roletype]["config"]),
-                                    log_potentials = np.array(self.param_selpref[roletype]["weight"]))
+                                    factor_configs = np.array(factor_configs, dtype = int),
+                                    log_potentials = np.array(log_potentials, dtype = np.float64))
+
+                # fg.add_factor_group(variable_groups = [ [concept_variables[i], concept_variables[j]]  for i, j in variable_pairs],
+                #                     factor_configs = np.array(self.param_selpref[roletype]["config"], dtype = int),
+                #                     log_potentials = np.array(self.param_selpref[roletype]["weight"], dtype = np.float64))
 
                 # print("role factor for role type", roletype, variable_pairs, [ [concept_variables[i], concept_variables[j]]  for i, j in variable_pairs])
 
@@ -441,7 +453,7 @@ def main():
     vgpath_obj = VGPaths(sdsdata = args.input, sdsout = args.output)
 
     # make SDS object
-    sds_obj = SDS(vgpath_obj, tilesize = arg.tilesize, tileovl = arg.tileovl)
+    sds_obj = SDS(vgpath_obj, tilesize = args.tilesize, tileovl = args.tileovl)
 
     # process each utterance go through utterances in the input file,
     sentlength_runtime = defaultdict(list)

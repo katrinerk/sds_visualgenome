@@ -27,7 +27,7 @@ parser.add_argument('--sdsinput', help="directory with input to sds, default: sd
 parser.add_argument('--sdsoutput', help="directory with sds output, default: sds_out/imagine_scen", default = "sds_out/imagine_scen/")
 parser.add_argument('--outdir', help="directory to write output for inspection, default: inspect_output/imagine_scen", default = "inspect_output/imagine_scen/")
 parser.add_argument('--vgdata', help="directory with VG data including frequent items, train/test split, topic model", default = "data/")
-parser.add_argument('--numsent_inspect', help = "number of sentences to write for inspection, default 10", type = int, default = 10)
+parser.add_argument('--num_inspect', help = "number of sentences to write for inspection, default 10", type = int, default = 10)
 
 args = parser.parse_args()
 
@@ -233,7 +233,7 @@ sentid_averageprecision = { }
 sentid_highestcorrect = { }
 
 # which sentences to sample for inspection?
-sentence_ids_to_inspect = random.sample(list(sentid_sent.keys()), args.numsent_inspect)
+sentence_ids_to_inspect = random.sample(list(sentid_sent.keys()), args.num_inspect)
 
 # loop over files, evaluate, write inspection files
 outpath = get_output_path(os.path.join(args.outdir, "eval_imagine_scen_out.txt"))
