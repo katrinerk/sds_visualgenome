@@ -142,7 +142,7 @@ if missing > 0:
 
 # for the objects where we have vectors, make data structures
 # for input into Partial Least Squares regression
-def make_pls_input(objectlabels, object_vec, object_att_prob):
+def make_pls_input(objectlabels, object_vec, obj_att_prob):
 
     X = [ ]
     Y = [ ]
@@ -151,15 +151,15 @@ def make_pls_input(objectlabels, object_vec, object_att_prob):
     for obj in objectlabels:
         if obj in object_vec:
             X.append(object_vec[obj])
-            Y.append( object_att_prob[obj] )
+            Y.append( obj_att_prob[obj] )
             used_object_labels.append( obj )
 
     return (X, Y, used_object_labels)
 
 print("Training and applying PLSR")
 
-Xtrain, Ytrain, training_used_object_labels = make_pls_input(training_objectlabels, object_vec, obj_att_prob)
-Xtest, Ytest, test_used_object_labels = make_pls_input(test_objectlabels, object_vec, obj_att_prob)
+Xtrain, Ytrain, training_used_object_labels = make_pls_input(training_objectlabels, vec_obj.object_vec, obj_att_prob)
+Xtest, Ytest, test_used_object_labels = make_pls_input(test_objectlabels, vec_obj.object_vec, obj_att_prob)
 
 # train PLS regression
 pls_obj = PLSRegression(n_components=args.plsr_components)
@@ -176,15 +176,15 @@ Ypredict_test = pls_obj.predict(Xtest)
 # write output for inspection:
 # several objects from the test portion, with gold and predicted features
 outpath = get_output_path(os.path.join(args.outdir, "eval_imagine_att_out.txt"))
-inspect_objectindices = random.sample(list(range(len(used_test_object_labelds))), args.num_inspect)
+inspect_objectindices = random.sample(list(range(len(test_used_object_labels))), args.num_inspect)
 with open(outpath, "w") as outf:
-    for objix in inspect_objectlabels:
-        objlabel = used_test_object_labels[objix]
+    for objix in inspect_objectindices:
+        objlabel = test_used_object_labels[objix]
         
         print("-----------\nObject:", objlabel, "\n", file = outf)
         
         print("Gold:", file = outf)
-        for a, p in sorted(object_att_prob[objlabel].items(), key = lambda p:p[1], reverse = True):
+        for a, p in sorted(zip(use_attributelabels, obj_att_prob[objlabel]), key = lambda p:p[1], reverse = True):
             print("\t", a, ":", p, file = outf)
         print(file = outf)
         
@@ -258,8 +258,8 @@ for image_id, attlabels_objref in vgiter.each_image_attributes_full(img_ids = te
         these_attlabels = [a for a in attlabels if a in use_attributelabels]
         if len(these_attlabels) > 0:
             for objlabel in test_imgid_obj[image_id][objref]:
-                if objlabel in object_vec:
-                    X_testsent.append(object_vec[objlabel])
+                if objlabel in vec_obj.object_vec:
+                    X_testsent.append(vec_obj.object_vec[objlabel])
                     goldatt_testsent.append(these_attlabels)
                     goldobj_testsent.append(objlabel)
 

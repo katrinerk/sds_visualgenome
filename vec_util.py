@@ -7,7 +7,7 @@ from gensim.models import KeyedVectors
 class VectorInterface:
     def __init__(self, vgpath_obj):
         vecfilename = vgpath_obj.vg_vecfilename()
-        object_vec = { }
+        self.object_vec = { }
 
         ###
         # read vectors,
@@ -30,13 +30,13 @@ class VectorInterface:
                 if label.endswith(".n") and "(" not in label and ")" not in label:
                     label = label[:-2]
                     label = label.replace("_", " ")
-                    object_vec[ label ] = np.array([ float(v) for v in pieces[1:]])
+                    self.object_vec[ label ] = np.array([ float(v) for v in pieces[1:]])
 
         # make gensim KeyedVector object
-        self.object_kv = KeyedVectors(len(list(object_vec.values())[0]))
-        self.object_kv.add_vectors(list(object_vec.keys()), list(object_vec.values()))
+        self.object_kv = KeyedVectors(len(list(self.object_vec.values())[0]))
+        self.object_kv.add_vectors(list(self.object_vec.keys()), list(self.object_vec.values()))
         self.object_kv.fill_norms()
-        self.object_kv_index_key = dict( (self.object_kv.get_index(key), key) for key in object_vec.keys())
+        self.object_kv_index_key = dict( (self.object_kv.get_index(key), key) for key in self.object_vec.keys())
         
 
     def all_objects_sim_centroid(self, object_labels):
