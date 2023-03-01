@@ -1,10 +1,12 @@
 # sds_visualgenome
-**Situation Description Systems applied to Visual Genome data**
+##Situation Description Systems applied to Visual Genome data**
 
-*Dependencies:*
+**Dependencies:**
+
 pgmax: need to install under Python 3.8
 
-*Setup:*
+**Setup:**
+
 In the directory with the source code, make a file settings.txt with the following content:
 ```
 [VisualGenome]
@@ -19,7 +21,7 @@ VGFreqCutoffRel = <frequency cutoff for relations in VG, suggestion 50>
 Testpercentage = <fraction of images to use for testing, suggestion 0.1>
 ```
 
-*General preprocessing steps, in order*:
+**General preprocessing steps, in order:**
 
 * vgcounts: Determine sufficiently frequent objects, attributes, relations in the Visual Genome
 * train_test_split: Split Visual Genome images into training and test portion
@@ -29,11 +31,13 @@ Testpercentage = <fraction of images to use for testing, suggestion 0.1>
 * change_vgdata_for_vecs: make version of the Visual Genome that only contains images in the training part of the split, retaining only sufficiently frequent objects, attributes, relations
 
 
-*Situation Description Systems*:
+**Situation Description Systems:**
+
 * sds: create factor graphs, run MAP inference on given collection of sentences
 * sds_interactive: interactively inspect sentences, make factor graphs, run MAP inference, marginal inference and what-if analyses
 
-*Evaluation tasks*:
+**Evaluation tasks:**
+
 * Cloze word sense disambiguation, objects (basically homonymy):
   1. make_sds_input_cloze.py	
   2. sds.py sds_in/cloze sds_out/cloze
