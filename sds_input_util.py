@@ -256,7 +256,7 @@ class VGParam:
                 for arg, sim in objectlabels_and_sims:
                     if sim > 0:
                         selpref_json[label]["config"].append( (predix, self.vgindex.o2ix(arg)))
-                        selpref_json[label]["weight"].append( sim**10)
+                        selpref_json[label]["weight"].append( sim)
                 
         return selpref_json
                     
