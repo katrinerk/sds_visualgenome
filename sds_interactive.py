@@ -17,7 +17,8 @@ import vgiterator
 from vgindex import VgitemIndex
 from vgpaths import VGPaths
 import sentence_util
-from sds_imagine_util import  ImagineScen
+from vec_util import VectorInterface
+from sds_imagine_util import  ImagineScen, ImagineAttr
 
 
 from sds import SDS
@@ -27,12 +28,13 @@ from sds import SDS
 # - let user add literals
 
 class InspectSentences:
-    def __init__(self, vgindex_obj, sds_obj, topic_obj, scen_obj, out_obj):
+    def __init__(self, vgindex_obj, sds_obj, topic_obj, scen_obj, attr_obj, out_obj):
         self.vgindex_obj = vgindex_obj
         self.sds_obj = sds_obj
         self.topic_obj = topic_obj
         self.output_obj = out_obj
         self.scen_obj = scen_obj
+        self.attr_obj = attr_obj
 
     ###
     # choose between sentences
@@ -104,7 +106,7 @@ q stop analyzing this sentence:
 
             elif user_input == "a":
                 literal_id = input("Please choose a literal index: ")
-                self.imagine_attr(int(literal_id), sentence_id, sentence)
+                self.imagine_attr(int(literal_id), sentence_id, sentence, mapresult)
                 
             elif user_input == "d":
                 literal_id = input("Please choose a literal index: ")
@@ -187,9 +189,35 @@ q stop analyzing this sentence:
         print()
         
 
-    def imagine_attr(self, literal_id, sentence_id, sentence):
-        pass
+    def imagine_attr(self, focusliteral_index, sentence_id, sentence, mapresult):
+        # confirming literal
+        wordliterals = [ell for ell in sentence if ell[0] == "w"]
+        focusliteral = wordliterals[focusliteral_index]
+        _, focuswordix, focusdref = focusliteral
 
+        # obtaining concept
+        conceptix = mapresult["concept"][focusliteral_index]
+        focusconcept = self.vgindex_obj.ix2l(conceptix)[0]
+        
+        print("\nPredicting attributes for focus literal:", self.vgindex_obj.ix2l(focuswordix)[0] + "(" + str(focusdref) + ") Concept", focusconcept, "\n")
+
+
+        Ypredict, _, used_obj_labels = self.attr_obj.predict_forobj([ focusconcept])
+        if len(used_obj_labels) != 1:
+            print("Could not predict any attributes.")
+            return
+
+        Ypredict = Ypredict.tolist()        
+        attlist = self.attr_obj.attributelabels
+        
+        top_attributes = [a for a, _ in sorted(zip(attlist, Ypredict[0]), key = lambda p:p[1], reverse = True)][:10]
+
+        
+        print("\nTop predicted attributes:")
+        print(", ".join( top_attributes))
+        
+        print()
+        
 
     
 #################
@@ -202,6 +230,8 @@ parser.add_argument('input', help="directory with input sentences")
 parser.add_argument('--tilesize', help="Scenario tiling: number of scenarios restricted by one Dir-Mult factor, default: 6", type = int, default = 6)
 parser.add_argument('--tileovl', help="Scenario tiling: overlap between tiles, default: 2", type = int, default = 2)
 parser.add_argument('--cloze', help="Look for additional cloze-generated word labels. default: False", action = "store_true")
+parser.add_argument('--num_att', help = "number of top attributes to use for prediction, default 500", type = int, default = 500)
+parser.add_argument('--plsr_components', help = "number of components to use for PLSR, default 100", type = int, default = 100)
 
 
 args = parser.parse_args()
@@ -251,6 +281,12 @@ topic_obj = sentence_util.TopicInfoUtil(vgpath_obj)
 # imagining objects from scenarios
 scen_obj = ImagineScen(vgpath_obj, vgindex_obj)
 
+# imagine attributes from objects
+vgiter = vgiterator.VGIterator(vgobjects_attr_rel)
+vec_obj = VectorInterface(vgpath_obj)
+
+attr_obj = ImagineAttr(vgiter, vec_obj, num_attributes = args.num_att, num_plsr_components = args.plsr_components)
+# print("HIER I have attributes for", attr_obj.used_training_objectlabels)
 
 #####
 # Main loop:
@@ -259,5 +295,5 @@ print()
 
 out_obj = sentence_util.SentencePrinter(vgindex_obj, with_wordliteral_index = True, show_attrel_unary = True)
 
-main_obj = InspectSentences(vgindex_obj, sds_obj, topic_obj, scen_obj, out_obj)
+main_obj = InspectSentences(vgindex_obj, sds_obj, topic_obj, scen_obj, attr_obj, out_obj)
 main_obj.main_loop(sentid_sentence)
