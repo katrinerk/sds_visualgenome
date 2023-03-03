@@ -57,14 +57,14 @@ Testpercentage = <fraction of images to use for testing, suggestion 0.1>
 
 ## Evaluation tasks
 
-* Cloze word sense disambiguation for objects (basically homonymy):
+### Cloze word sense disambiguation for objects (basically homonymy):
   1. ```python3 make_sds_input_cloze.py	[--output <outdir default sds_in/cloze>] --vgdata <data_dir default data/>]```
 
   2. ```python3 sds.py sds_in/cloze sds_out/cloze```
 
   3. ```python3 eval_cloze [--sdsinput <dir default sds_in/cloze>] [--sdsoutput <dir default sds_out/cloze>] [--outdir <dir for qualitative analysis output default inspect_output/cloze>] [--vgdata <data_dir default data/>]```
 
-* Imagining additional objects based on scenarios:
+### Imagining additional objects based on scenarios:
 
   1. ```python3 make_sds_input_imagine_scen.py [--output <outdir default sds_in/imagine_scen>] --vgdata <data_dir default data/>]```
 
@@ -72,7 +72,7 @@ Testpercentage = <fraction of images to use for testing, suggestion 0.1>
 
   3. ```python3 eval_imagine_scen.py [--sdsinput <dir default sds_in/imagine_scen>] [--sdsoutput <dir default sds_out/imagine_scen>] [--outdir <dir for qualitative analysis output default inspect_output/imagine_scen>] [--vgdata <data_dir default data/>]```
 
-* Imagining additional attributes based on object embeddings:
+### Imagining additional attributes based on object embeddings:
   1. ```python3 eval_imagine_attr.py [--outdir <dir for qualitative analysis output default inspect_output/imagine_attr>] [--vgdata <data_dir default data/>]```
 
 ## Transforming Visual Genome data to make vectors for concepts
