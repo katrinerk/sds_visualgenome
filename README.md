@@ -39,6 +39,8 @@ Testpercentage = <fraction of images to use for testing, suggestion 0.1>
 
 ```python3 gensim_topic_modeling.py [--vgdata <data_dir default data/>] [--numtopics <num default 20>]```
 
+5. Manually: put file with Aurelie's vectors in the directory you're using as vgdata directory
+
 
 ## Running Situation Description Systems inference
 
