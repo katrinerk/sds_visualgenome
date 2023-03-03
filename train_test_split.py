@@ -22,7 +22,7 @@ parser = ArgumentParser()
 parser.add_argument('--vgdata', help="directory with VG frequent-item information and train/test split", default = "data/")
 args = parser.parse_args()
 
-vgpath_obj = VGPaths(vgdata = vgdata)
+vgpath_obj = VGPaths(vgdata = args.vgdata)
 
 
 # what percentage of data is for the test set?
