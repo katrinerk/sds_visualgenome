@@ -90,8 +90,9 @@ class VGParam:
         
         ##
         # global data: alpha, number of concepts (objects, attributes, relations), number of scenarios, number of words
+        # add one topic: for words that have no topic assigned
         retv.append({"num_concepts" : num_concepts,
-                      "num_scenarios" : topic_param["num_topics"],
+                      "num_scenarios" : topic_param["num_topics"] + 1,
                       "num_words" : num_concepts,
                       "dirichlet_alpha" : topic_param["alpha"]})
 
@@ -136,10 +137,19 @@ class VGParam:
                 concept_scenario[conceptindex]["scenario"].append( scenarioindex.item())
                 concept_scenario[conceptindex]["weight"].append(topic_weights[scenarioindex].item())
 
+        # k0 = list(concept_scenario.keys())[0]
+        # print("HIER0", k0, concept_scenario[k0]["scenario"], concept_scenario[k0]["weight"])
+
         # sanity check: do we have scenarios for all frequent concepts?
-        for i, concept in enumerate(self.vgobjects_attr_rel["objects"]):
+        # if not, assign it the very last scenario, with probability 1
+        for i in range(self.vgindex.lastix + 1):
             if i not in concept_scenario:
-                print("missing scenarios for concept", i, concept)
+                concept_scenario[ i ] = {"scenario" : [ topic_param["num_topics"] ],
+                                         "weight" : [ 0.0 ]}
+                # print("missing scenarios for concept", i, concept)
+                # print(concept_scenario[i]["scenario"], concept_scenario[i]["weight"])
+                # sys.exit(0)
+
 
         # done with scenario-concept probs
         retv.append( concept_scenario)
