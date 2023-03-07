@@ -33,7 +33,7 @@ class TopicInfoUtil:
     def topic_info(self, topic_number):
         if topic_number not in self.topic:
             # not found
-            return None
+            return "[dummy topic]"
 
         else:
             # return string that describes the topic

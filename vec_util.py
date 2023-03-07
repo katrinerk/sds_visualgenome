@@ -110,29 +110,39 @@ class VectorInterface:
         sims = self.object_kv.cosine_similarities(centroid, self.object_kv.get_normed_vectors())
 
         # and return as list of pairs (object label, sim)
-        return [ (self.object_kv_index_key[ix], sim) for ix, sim in enumerate(sims.tolist())]
+        return [  (self.object_kv_index_key[ix], sim) for ix, sim in enumerate(sims.tolist()) ]
+        sortedlist = sorted([ (self.object_kv_index_key[ix], sim) for ix, sim in enumerate(sims.tolist())], key = lambda p:p[1], reverse = True)
+        return [(ix, sim) for ix, sim in sortedlist if sim > 0]
 
     # all similarities, to this label, ranked highest to lowest,
     # where type = object, attr, predarg0, predarg1
     def ranked_sims(self, label, elltype):
         if elltype == "object":
-            sims = self.object_kv.similar_by_key(label, topn = None)
-            return [ (self.object_kv_index_key[ix], sim) for ix, sim in enumerate(sims.tolist())]
+            simfunc = self.object_kv.similar_by_key()
+            keydict = self.object_kv_index_key
         
         elif elltype == "attr":
-            sims = self.attrib_kv.similar_by_key(label, topn = None)
-            return [ (self.attrib_kv_index_key[ix], sim) for ix, sim in enumerate(sims.tolist())]
+            simfunc = self.attrib_kv.similar_by_key
+            keydict = self.attrib_kv_index_key
         
         elif elltype == "predarg0":
-            sims = self.predarg0_kv.similar_by_key(label, topn = None)
-            return [ (self.predarg0_kv_index_key[ix], sim) for ix, sim in enumerate(sims.tolist())]
+            simfunc = self.predarg0_kv.similar_by_key
+            keydict = self.predarg0_kv_index_key
         
         elif elltype == "predarg1":
-            sims = self.predarg1_kv.similar_by_key(label, topn = None)
-            return [ (self.predarg1_kv_index_key[ix], sim) for ix, sim in enumerate(sims.tolist())]
+            simfunc = self.predarg1_kv.similar_by_key
+            keydict = self.predarg1_kv_index_key
             
         else:
             raise Exception("unknown label type " + elltype)
 
-                        
-            
+
+        # all similarities, ranked
+        sims = simfunc(label, topn = None)
+        # add item labels
+        pairs = [ (keydict[ix], sim) for ix, sim in enumerate(sims.tolist())]
+        # sort by similarity, first will be self
+        sortedlist = sorted(pairs, key = lambda p:p[1], reverse= True)
+        # return all above-zero similarities
+        return [ (ix, sim) for ix, sim in sortedlist if sim > 0]
+

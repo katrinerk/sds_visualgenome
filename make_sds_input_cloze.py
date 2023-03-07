@@ -105,7 +105,7 @@ print("Determining cloze word pairs")
 #######
 # data structure for gold info:
 # store under "cloze" for the task, mark "binned" as true
-gold = { "cloze" : {"binned" : 1, "words" : { } } }
+gold = { "cloze" : {"binned" : 1, "clozetype" : "objects", "words" : { } } }
 
 ####
 # select object pairs
@@ -214,10 +214,6 @@ vgparam_obj.write(global_param, scenario_concept_param, word_concept_param, selp
 # as arguments of at least one predicate.
 #
 # transform test sentences: change the target word to the cloze word.
-#
-#
-# if a test sentence contains both words of a cloze pair,
-# delete occurrences of one of the two, at random.
 #
 # protect occurrences of the target cloze word, and of
 # all predicates that take it as an argument, from
