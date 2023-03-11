@@ -139,15 +139,16 @@ print("Accuracy by cloze word")
 print("------------")
 for clozeword_id in sorted(clozeword_model_acc.keys(), key = lambda c: sum(golddata["cloze"]["words"][str(c)]["freq"]), reverse = True):
     concepts = golddata["cloze"]["words"][str(clozeword_id)]["labels"]
+    clozeword = golddata["cloze"]["words"][str(clozeword_id)]["word"]
     freq = golddata["cloze"]["words"][str(clozeword_id)]["freq"]
-    print(", ".join(concepts))
+    print(clozeword)
     print("\tModel:", round(clozeword_model_acc[clozeword_id], 3), "Baseline:", round(clozeword_baseline_acc[clozeword_id], 3),
           "Training freq", ", ".join([str(f) for f in freq]))
             
     
     
 ###
-# write to file: per-clozeword evaluation and list of wrongly classified cases
+ # write to file: per-clozeword evaluation and list of wrongly classified cases
 
 # obtain topic characterizations
 topic_obj = sentence_util.TopicInfoUtil(vgpath_obj)

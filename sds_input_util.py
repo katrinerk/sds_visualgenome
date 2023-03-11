@@ -531,6 +531,17 @@ class VGSentences:
             drefs_unary = set(d for _, _, d in words + words_to_keep)
             if any(d not in drefs_unary for _, _, _, d in roles) or any(d not in drefs_unary for _, _, d, _ in roles):
                 print("discourse referent without unary constraint", sentid)
+                # HIER
+                for _, _, d1, d2 in roles:
+                    if d1 not in drefs_unary: print("missing unary for", d1)
+                    if d2 not in drefs_unary: print("missing unary for", d2)
+                print("------words to keep")
+                for w in words_to_keep: print(w)
+                print("-------other words")
+                for w in words: print(w)
+                print("---------roles")
+                for r in roles: print(r)
+                sys.exit(0)
             
             outjson.append( { "sentence_id" : sentid, "sentence" : words  + roles } )
         

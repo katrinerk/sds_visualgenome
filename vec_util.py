@@ -89,16 +89,20 @@ class VectorInterface:
         self.attrib_kv_index_key = dict( (self.attrib_kv.get_index(key), key) for key in self.attrib_vec.keys())
 
         self.predarg0_kv = KeyedVectors(len(list(self.predarg0_vec.values())[0]))
-        self.predarg0_kv.add_vectors(list(self.predarg0_vec.keys()), list(self.predarg0_vec.values()))
+        self.predarg0_kv.add_vectors([self.kc(k) for k in self.predarg0_vec.keys()], list(self.predarg0_vec.values()))
         self.predarg0_kv.fill_norms()
-        self.predarg0_kv_index_key = dict( (self.predarg0_kv.get_index(key), key) for key in self.predarg0_vec.keys())
+        self.predarg0_kv_index_key = dict( (self.predarg0_kv.get_index(self.kc(key)), key) for key in self.predarg0_vec.keys())
         
 
         self.predarg1_kv = KeyedVectors(len(list(self.predarg1_vec.values())[0]))
-        self.predarg1_kv.add_vectors(list(self.predarg1_vec.keys()), list(self.predarg1_vec.values()))
+        self.predarg1_kv.add_vectors([self.kc(k) for k in self.predarg1_vec.keys()], list(self.predarg1_vec.values()))
         self.predarg1_kv.fill_norms()
-        self.predarg1_kv_index_key = dict( (self.predarg1_kv.get_index(key), key) for key in self.predarg1_vec.keys())
+        self.predarg1_kv_index_key = dict( (self.predarg1_kv.get_index(self.kc(key)), key) for key in self.predarg1_vec.keys())
         
+        
+    # key transforms for pred/arg pairs
+    def kc(self, predarg):
+        return "|".join(predarg)
         
 
     def all_objects_sim_centroid(self, object_labels):
@@ -120,25 +124,29 @@ class VectorInterface:
         if elltype == "object":
             simfunc = self.object_kv.similar_by_key()
             keydict = self.object_kv_index_key
+            tlabel = label
         
         elif elltype == "attr":
             simfunc = self.attrib_kv.similar_by_key
             keydict = self.attrib_kv_index_key
+            tlabel = label
         
         elif elltype == "predarg0":
             simfunc = self.predarg0_kv.similar_by_key
             keydict = self.predarg0_kv_index_key
-        
+            tlabel = self.kc(label)
+
         elif elltype == "predarg1":
             simfunc = self.predarg1_kv.similar_by_key
             keydict = self.predarg1_kv_index_key
+            tlabel = self.kc(label)
             
         else:
             raise Exception("unknown label type " + elltype)
 
 
         # all similarities, ranked
-        sims = simfunc(label, topn = None)
+        sims = simfunc(tlabel, topn = None)
         # add item labels
         pairs = [ (keydict[ix], sim) for ix, sim in enumerate(sims.tolist())]
         # sort by similarity, first will be self
