@@ -29,12 +29,9 @@ class VGParam:
     # frequentobj: counts of frequent objects, attributes, relations, will be read from file if not given
     # selpref_vectors: if True, compute selectional preferences using vectors rather than observed
     #   relative frequencies
-    def __init__(self, vgpath_obj, top_scenarios_per_concept = 5, frequentobj = None, selpref_vectors = True):
+    def __init__(self, vgpath_obj, frequentobj = None, selpref_vectors = True):
         # object with paths to VG data
         self.vgpath_obj = vgpath_obj
-
-        # keep how many scenarios per concept? 
-        self.top_scenarios_per_concept = top_scenarios_per_concept
 
         if frequentobj is None:
 
@@ -131,11 +128,12 @@ class VGParam:
         concept_scenario = {}
         for columnindex, conceptindex in enumerate(conceptindices_tm):
             topic_weights = term_topic_matrix[:, columnindex]
-            k_largest_indices = np.argpartition(topic_weights, -self.top_scenarios_per_concept)[-self.top_scenarios_per_concept:]
-            concept_scenario[ conceptindex ] = { "scenario": [], "weight":[]}
-            for scenarioindex in k_largest_indices:
-                concept_scenario[conceptindex]["scenario"].append( scenarioindex.item())
-                concept_scenario[conceptindex]["weight"].append(topic_weights[scenarioindex].item())
+            # k_largest_indices = np.argpartition(topic_weights, -self.top_scenarios_per_concept)[-self.top_scenarios_per_concept:]
+            concept_scenario[ conceptindex ] = { "scenario": list(range(len(topic_weights))),
+                                                 "weight": [ w.item() for w in topic_weights ] }
+            # for scenarioindex in k_largest_indices:
+            #     concept_scenario[conceptindex]["scenario"].append( scenarioindex.item())
+            #     concept_scenario[conceptindex]["weight"].append(topic_weights[scenarioindex].item())
 
         # k0 = list(concept_scenario.keys())[0]
         # print("HIER0", k0, concept_scenario[k0]["scenario"], concept_scenario[k0]["weight"])

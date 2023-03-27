@@ -32,6 +32,7 @@ import copy
 import os
 import timeit
 import statistics
+import configparser
 
 from vgpaths import VGPaths
 
@@ -78,16 +79,25 @@ class DirMultStore:
 ################################
 ################################
 class SDS:
-    def __init__(self, vgpath_obj, tilesize = 6, tileovl = 2):
-        self.vgpath_obj = vgpath_obj
+    def __init__(self, vgpath_obj, scenario_config):
+        self.scenario_handling = scenario_config["InSDS"]
+        print("Scenario handling:", self.scenario_handling)
         
+        if self.scenario_handling != "tiled":
+            print("Only tiled handling of scenarios implemented so far")
+            sys.exit(1)
+
+        self.tilesize = int(scenario_config["Tilesize"])
+        self.tileovl = int(scenario_config["Tileoverlap"])
+        self.top_scenarios_per_concept = int(scenario_config["TopScenarios"])
+        
+        self.vgpath_obj = vgpath_obj
+
         self.param_general, self.param_selpref, self.param_scenario_concept, self.param_word_concept = self.read_parameters(vgpath_obj)
 
         # keep previously computed Dirichlet Multinomial log probabilities
         self.dirmult_obj = DirMultStore(self.param_general["dirichlet_alpha"], self.param_general["num_scenarios"])
 
-        self.tilesize = tilesize
-        self.tileovl = tileovl
         
         
     ########################3
@@ -113,7 +123,21 @@ class SDS:
         scenario_zipfile, scenario_file = filenames["scenario_concept"]
         with zipfile.ZipFile(scenario_zipfile) as azip:
             with azip.open(scenario_file) as f:
-                param_scenario_concept = json.load(f)
+                prelim_param_scenario_concept = json.load(f)
+
+        if self.scenario_handling == "tiled":
+            # restrict each concept to its top n scenarios
+            print("Restricting each concept to its top", self.top_scenarios_per_concept, "scenarios")
+            param_scenario_concept = { }
+            for conceptindex in prelim_param_scenario_concept.keys():
+                top_n_scenarios_and_weights = sorted( zip( prelim_param_scenario_concept[conceptindex]["scenario"], prelim_param_scenario_concept[conceptindex]["weight"]),
+                                                           key = lambda pair:pair[1], reverse = True)[:self.top_scenarios_per_concept]
+                
+                param_scenario_concept[ conceptindex ] = { "scenario" : [s for s, w in top_n_scenarios_and_weights],
+                                                           "weight" : [w for s, w in top_n_scenarios_and_weights]}
+        else:
+            # nothing to be changed, keep all scenarios for each concept
+            param_scenario_concept = prelim_param_scenario_concept
 
         # read word/concept weights, if any
         wordconcept_zipfile, wordconcept_file = filenames["word_concept"]
@@ -441,19 +465,22 @@ class SDS:
     
 ######################3
 def main():
+
+    # command line arguments
     parser = ArgumentParser()
     parser.add_argument('input', help="directory with input sentences")
-    parser.add_argument('output', help="directory for system output")
-    parser.add_argument('--tilesize', help="Scenario tiling: number of scenarios restricted by one Dir-Mult factor, default: 6", type = int, default = 6)
-    parser.add_argument('--tileovl', help="Scenario tiling: overlap between tiles, default: 2", type = int, default = 2)
-    
+    parser.add_argument('output', help="directory for system output")    
 
     args = parser.parse_args()
+
+    # settings file
+    config = configparser.ConfigParser()
+    config.read("settings.txt")
 
     vgpath_obj = VGPaths(sdsdata = args.input, sdsout = args.output)
 
     # make SDS object
-    sds_obj = SDS(vgpath_obj, tilesize = args.tilesize, tileovl = args.tileovl)
+    sds_obj = SDS(vgpath_obj, config["Scenarios"])
 
     # process each utterance go through utterances in the input file,
     sentlength_runtime = defaultdict(list)

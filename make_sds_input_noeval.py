@@ -30,7 +30,6 @@ from vgpaths import VGPaths
 parser = ArgumentParser()
 parser.add_argument('--output', help="directory to write output to, default: sds_in/vanilla", default = "sds_in/vanilla/")
 parser.add_argument('--vgdata', help="directory with VG data including frequent items, train/test split, topic model", default = "data/")
-parser.add_argument('--scen_per_concept', help="Number of top scenarios to record for a concept, default 5", type = int, default = 5)
 parser.add_argument('--selpref_relfreq', help="selectional preferences using relative frequency rather than similarity to centroid?  default: False", action = "store_true")
 parser.add_argument('--numsent', help="number of test sentences to sample, default 100", type = int, default = 100)
 
@@ -62,7 +61,7 @@ vgobj = vgiterator.VGIterator(vgcounts = vgobjects_attr_rel)
 
 ####
 # write parameters for SDS.
-vgparam_obj = VGParam(vgpath_obj, top_scenarios_per_concept = args.scen_per_concept, frequentobj = vgobjects_attr_rel,
+vgparam_obj = VGParam(vgpath_obj, frequentobj = vgobjects_attr_rel,
                       selpref_vectors = not(args.selpref_relfreq))
 
 print("computing parameters")

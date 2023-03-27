@@ -30,7 +30,6 @@ parser.add_argument('--selpref_relfreq', help="selectional preferences using rel
 parser.add_argument('--pairs_per_bin', help="Number of cloze pairs to sample per bin, default 20", type = int, default = 1)
 parser.add_argument('--numsent', help="Number of sentences per cloze pair, default 50", type = int, default = 50)
 parser.add_argument('--bins', help="Bins, given as string of comma-separated nubers, default '65,100,220,750,100000'", default = "65,100,220,750,100000")
-parser.add_argument('--scen_per_concept', help="Number of top scenarios to record for a concept, default 5", type = int, default = 5)
 
 args = parser.parse_args()
 
@@ -188,7 +187,7 @@ for frequencybin, objects in bin_objects.items():
 
 print("writing SDS parameters")
     
-vgparam_obj = VGParam(vgpath_obj, top_scenarios_per_concept = args.scen_per_concept, selpref_vectors = not(args.selpref_relfreq))
+vgparam_obj = VGParam(vgpath_obj, selpref_vectors = not(args.selpref_relfreq))
 
 global_param, scenario_concept_param, word_concept_param, selpref_param = vgparam_obj.get()
 

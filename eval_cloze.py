@@ -12,7 +12,6 @@ import numpy as np
 from argparse import ArgumentParser
 
 import vgiterator
-from sds_input_util import VGSentences, VGParam
 import sentence_util
 from vgindex import VgitemIndex
 from vgpaths import VGPaths, get_output_path

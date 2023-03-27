@@ -12,6 +12,7 @@ import numpy as np
 import random
 import statistics
 from argparse import ArgumentParser
+import configparser
 
 import vgiterator
 from vgindex import VgitemIndex
@@ -227,14 +228,16 @@ q stop analyzing this sentence:
 
 parser = ArgumentParser()
 parser.add_argument('input', help="directory with input sentences")
-parser.add_argument('--tilesize', help="Scenario tiling: number of scenarios restricted by one Dir-Mult factor, default: 6", type = int, default = 6)
-parser.add_argument('--tileovl', help="Scenario tiling: overlap between tiles, default: 2", type = int, default = 2)
 parser.add_argument('--cloze', help="Look for additional cloze-generated word labels. default: False", action = "store_true")
 parser.add_argument('--num_att', help = "number of top attributes to use for prediction, default 500", type = int, default = 500)
 parser.add_argument('--plsr_components', help = "number of components to use for PLSR, default 100", type = int, default = 100)
 
 
 args = parser.parse_args()
+
+# settings file
+config = configparser.ConfigParser()
+config.read("settings.txt")
 
 vgpath_obj = VGPaths(sdsdata = args.input)
 
@@ -249,7 +252,7 @@ with zipfile.ZipFile(vgcounts_zipfilename) as azip:
 # for creating factor graphs
 print("initializing...")
 
-sds_obj = SDS(vgpath_obj, tilesize = args.tilesize, tileovl = args.tileovl)
+sds_obj = SDS(vgpath_obj, config["Scenarios"])
 
 # read sentences, store under sentence ID
 sentid_sentence = { }

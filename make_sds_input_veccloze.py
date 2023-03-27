@@ -35,7 +35,6 @@ parser.add_argument('--pairs_predarg', help="Number of pred/arg cloze pairs to s
 parser.add_argument('--numsent', help="Number of sentences per attr. cloze pair, default 50", type = int, default = 50)
 parser.add_argument('--top_n_sim', help="Number of top n neighbors from which to select a cloze pair, default 10", type = int, default = 10)
 parser.add_argument('--selpref_relfreq', help="selectional preferences using relative frequency rather than similarity to centroid?  default: False", action = "store_true")
-parser.add_argument('--scen_per_concept', help="Number of top scenarios to record for a concept, default 5", type = int, default = 5)
 
 args = parser.parse_args()
 
@@ -65,7 +64,7 @@ random.seed(543)
 
 vgindex_obj = VgitemIndex(vgobjects_attr_rel)
 
-vgparam_obj = VGParam(vgpath_obj, top_scenarios_per_concept = args.scen_per_concept, selpref_vectors = not(args.selpref_relfreq),
+vgparam_obj = VGParam(vgpath_obj, selpref_vectors = not(args.selpref_relfreq),
                       frequentobj = vgobjects_attr_rel)
 
 global_param, scenario_concept_param, word_concept_param, selpref_param = vgparam_obj.get()

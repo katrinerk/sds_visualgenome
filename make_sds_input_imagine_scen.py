@@ -28,7 +28,6 @@ parser.add_argument('--vgdata', help="directory with VG data including frequent 
 parser.add_argument('--numsent', help="number of sentences to sample for evaluation, default 1000", type = int, default = 100)
 parser.add_argument('--maxobj', help="maximum number of objects per sentence to retain, default 25", type = int, default = 25)
 parser.add_argument('--testfrac', help="for short sentences, fraction of objects to use for testing, default 0.3", type = float, default = 0.3)
-parser.add_argument('--scen_per_concept', help="Number of top scenarios to record for a concept, default 5", type = int, default = 5)
 
 args = parser.parse_args()
 print("Reading VG data from", args.vgdata, "and writing output to", args.output)
@@ -65,7 +64,7 @@ random.seed(6543)
 
 print("writing SDS parameters")
     
-vgparam_obj = VGParam(vgpath_obj, top_scenarios_per_concept = args.scen_per_concept)
+vgparam_obj = VGParam(vgpath_obj)
 global_param, scenario_concept_param, word_concept_param, selpref_param = vgparam_obj.get()
 vgparam_obj.write(global_param, scenario_concept_param, word_concept_param, selpref_param)
 
