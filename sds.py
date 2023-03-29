@@ -14,12 +14,6 @@
 #
 #
 
-# What to do about concepts that aren't connected to any scenarios?
-# if all concepts for a word aren't connected to scenarios, we want to not
-# have a scenario node -- and pass that information on.
-# but what if some of the concepts of a node aren't connected to scenarios?
-# is their value unconstrained?
-
 import sys
 import itertools
 from argparse import ArgumentParser
@@ -76,17 +70,133 @@ class DirMultStore:
 
         return count
 
+###########################
+# helper class that runs posterior sampling
+# over topics for a given sentence
+class ScenarioSampler:
+    # concept scenario prob: concept -> "scenario" : list of scenarios, "weight" -> list of log probabilities
+    # alpha: dirichlet alpha
+    # num topics: number of topics
+    # num samples: how many samples to draw per Gibbs sampler run
+    # num starts: how many runs/ restarts to do for the Gibbs sampler
+    # discard: how many samples to discard at the beginning 
+    def __init__(self, concept_scenario_logprob, word_concept_logprob, alpha, num_topics, num_words, num_samples, num_starts, discard):        
+        # matrix: one row per topic, one column per word
+        # probabilities, not log probabilities
+        self.topic_word_prob = np.zeros((num_topics, num_words))
+
+        for word_i in range(num_words):
+            if str(word_i) in word_concept_logprob:
+                concepts_for_i = list(word_concept_logprob[str(word_i)].items())
+            else:
+                concepts_for_i = [(str(word_i), 0.0)]
+
+            for concept_j, wordi_conceptj_logprob in concepts_for_i:
+                for scenario_k, scenk_concj_logprob in zip(concept_scenario_logprob[concept_j]["scenario"], concept_scenario_logprob[concept_j]["weight"]):
+                    self.topic_word_prob[scenario_k, word_i] += math.exp(wordi_conceptj_logprob) * math.exp(scenk_concj_logprob)
+        
+
+        
+        self.num_topics = num_topics        
+        self.alpha = alpha
+        self.num_samples = num_samples
+        self.num_starts = num_starts
+        self.discard = discard
+
+    # run self.num_starts runs of a Gibbs sampler,
+    # each time collecting self.num_samples samples
+    # and discarding the first self.discard
+    def sample_scenarios(self, sentence):
+        
+        results = [ ]
+        for i in range(self.num_starts):
+            initial = self._initialize(len(sentence))
+            sample = self._gibbs_onerun(sentence, initial, self.num_samples)
+            results.append(sample[self.discard:, :])
+
+        samples = np.concatenate(results)
+
+        return self._sample2logprobs(samples, len(sentence), sentence)
+
+
+    # draw initial sample of topic assignments
+    def _initialize(self,sentlen):
+        return np.random.randint(0, self.num_topics, size = sentlen)
+
+    # gibbs sampler, one run for given initial assignment
+    def _gibbs_onerun(self, sentence, initial_assignment, num_samples):
+        
+        samples = np.empty([num_samples+1, len(sentence)], dtype = np.int64)  #sampled points
+        samples[0] = initial_assignment
+
+        for sample_ix in range(num_samples):
+
+            thissample = [ ]
+            # each "word" in this sentence is a list of concepts that could apply.
+            # for each of them, sample a topic
+            for i, word in enumerate(sentence):
+                thissample.append(self._cond_sampler(word, samples[sample_ix], i))
+
+            samples[sample_ix+1] = np.array(thissample)
+
+        return samples
+    
+    # conditional sampler: resample topic for given word at focus index,
+    # given all other topics
+    def _cond_sampler(self, word, topics, focus_ix):
+        # how often is each topic assigned, outside the focus index?
+        topic_counts = self._count_topics_excluding(topics, focus_ix)
+
+        # add the Dirichlet alpha
+        topic_counts = topic_counts + self.alpha
+        # print("HIER topic counts", topic_counts)
+
+        # probability of focus word under all topics 
+        focusword_probs = self.topic_word_prob[:, word]
+        # print("HIER focus word probs", focusword_probs)
+
+        # probability of topic z for this word right now:
+        # focusword_probs[z] * (count_z + alpha) / (sum_z' count_z' + sentlength * alpha)
+        topic_probs = np.array([focusword_probs[i] * topic_counts[i] for i in range(self.num_topics)])
+        topic_probs = topic_probs / topic_probs.sum()
+        # print("HIER topic probs", topic_probs)
+
+        # re-sample a topic for this word
+        return  np.random.choice(self.num_topics, p = topic_probs)
+
+    # count how often each topic occurs in the sentence,
+    # excluding one particular word
+    def _count_topics_excluding(self, topics, exclude_ix):
+        nonfocus_topics = np.array([t for i, t in enumerate(topics) if i != exclude_ix])
+    
+        return np.bincount(nonfocus_topics, minlength = self.num_topics)
+
+    
+    # turn samples into scenario probabilities.
+    # return: for each word, a list of scenarios with nonzero probabilities, and log probabilities
+    def _sample2logprobs(self, samples, numwords, sentence):
+        word_topics_and_logprobs = [ ]
+        for i in range(numwords):
+            counts = np.bincount(samples[:, i], minlength = self.num_topics)
+            scenarios_with_nonzero_counts = np.nonzero(counts)
+            logprobs = np.log(counts[ scenarios_with_nonzero_counts] / sum(counts))
+            word_topics_and_logprobs.append( (scenarios_with_nonzero_counts[0], logprobs))
+
+        return word_topics_and_logprobs
+
+
+    
 ################################
 ################################
 class SDS:
     def __init__(self, vgpath_obj, scenario_config):
         self.scenario_handling = scenario_config["InSDS"]
+        if self.scenario_handling not in ["tiled", "unary"]:
+            print("Error: scenario handling method must be either 'tiled' or 'unary', I got:", self.scenario_handling)
+            sys.exit(1)
+            
         print("Scenario handling:", self.scenario_handling)
         
-        if self.scenario_handling != "tiled":
-            print("Only tiled handling of scenarios implemented so far")
-            sys.exit(1)
-
         self.tilesize = int(scenario_config["Tilesize"])
         self.tileovl = int(scenario_config["Tileoverlap"])
         self.top_scenarios_per_concept = int(scenario_config["TopScenarios"])
@@ -96,8 +206,13 @@ class SDS:
         self.param_general, self.param_selpref, self.param_scenario_concept, self.param_word_concept = self.read_parameters(vgpath_obj)
 
         # keep previously computed Dirichlet Multinomial log probabilities
-        self.dirmult_obj = DirMultStore(self.param_general["dirichlet_alpha"], self.param_general["num_scenarios"])
-
+        if self.scenario_handling == "tiled":
+            self.dirmult_obj = DirMultStore(self.param_general["dirichlet_alpha"], self.param_general["num_scenarios"])
+        else:
+            self.scen_sampling_obj = ScenarioSampler(self.param_scenario_concept, self.param_word_concept, 
+                                                     self.param_general["dirichlet_alpha"], self.param_general["num_scenarios"], self.param_general["num_words"],
+                                                     int(scenario_config["NumSamples"]), int(scenario_config["Restarts"]), int(scenario_config["Discard"]))
+                                                    
         
         
     ########################3
@@ -261,9 +376,9 @@ class SDS:
         # for each role, a factor that implements selectional constraints
         self.constrain_roles(fg, concept_variables, conceptvar_concepts, conceptvar_indices, roleliterals)
 
-        # across all scenarios, a factor (or constellation of factors)
-        # to implement the Dirichlet Multinomial distribution
-        self.constrain_scenarios(fg, scenario_variables, num_nodes, conceptvar_concepts)
+        # constrain scenarios according to a Dirichlet Multinomial
+        # (approximately)
+        self.constrain_scenarios(fg, scenario_variables, num_nodes, conceptvar_concepts, wordliterals)
 
         ###
         # finalize graph
@@ -411,12 +526,26 @@ class SDS:
 
     ##########
     # Dirichlet-Multinomial as constraint on co-occurrences of scenarios
-    def constrain_scenarios(self, fg, scenario_variables, num_nodes, conceptvar_concepts):
+    def constrain_scenarios(self, fg, scenario_variables, num_nodes, conceptvar_concepts, wordliterals):
 
         # only one scenario? nothing to constrain
         if self.param_general["num_scenarios"] < 2:
             return
 
+        if self.scenario_handling == "tiled":
+            self.constrain_scenarios_tiled(fg, scenario_variables, num_nodes, conceptvar_concepts)
+
+        elif self.scenario_handling == "unary":
+            self.constrain_scenarios_unary(fg, scenario_variables, num_nodes, wordliterals)
+
+        else:
+            raise Exception("Unknown scenario handling " + str(self.scenario_handling))
+
+    # instead of a single factor constraining all scenario nodes,
+    # have "tiled" factors, each jointly restricting k scenario nodes, with some overlap.
+    # this also assumes that we only have a limited number of scenarios per scenario node.
+    def constrain_scenarios_tiled(self, fg, scenario_variables, num_nodes, conceptvar_concepts):
+        
         # "tiling" scenario constraints:
         # we are only constraining `self.tilesize` scenarios at a time,
         # with an overlap of `self.tileovl`
@@ -461,7 +590,19 @@ class SDS:
             # print("scenario factor", [scenario_variables[i] for i in range(num_nodes)])
 
               
+    # instead of a single factor constraining all scenario nodes,
+    # run a sampler to determine posterior probabilities of scenarios for all concepts.
+    # then add a unary factor for each scenario node restricting it according to its
+    # marginal scenario probabilities
+    def constrain_scenarios_unary(self, fg, scenario_variables, num_nodes, wordliterals):
+        word_scenario_logprobs = self.scen_sampling_obj.sample_scenarios([ int(wordindex) for _, wordindex, _ in wordliterals])
 
+        for i in range(num_nodes):
+            sc_indices, logprobs = word_scenario_logprobs[i]
+            
+            fg.add_factor(variables = [ scenario_variables[i]],
+                          factor_configs = np.array([[scx] for scx in sc_indices]),
+                          log_potentials = logprobs )
     
 ######################3
 def main():
@@ -491,7 +632,7 @@ def main():
     # store MAP results and marginals
     results = [ ]
     
-    for sentence_id, sentence in sds_obj.each_sentence_json(verbose = True):
+    for sentence_id, sentence in sds_obj.each_sentence_json(verbose = False):
 
         sentlength = sum(1 for ell in sentence if ell[0] == "w")
 

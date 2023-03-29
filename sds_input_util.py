@@ -80,6 +80,7 @@ class VGParam:
                 topic_wordlist = json.load(f)
         
             # term-document matrix, one row per topic, one column per word
+            # these are log probabilities
             with azip.open(topicword_filename) as f:
                 term_topic_matrix = np.array(json.load(f))
 
@@ -88,8 +89,9 @@ class VGParam:
         ##
         # global data: alpha, number of concepts (objects, attributes, relations), number of scenarios, number of words
         # add one topic: for words that have no topic assigned
+        num_scenarios = topic_param["num_topics"] + 1
         retv.append({"num_concepts" : num_concepts,
-                      "num_scenarios" : topic_param["num_topics"] + 1,
+                      "num_scenarios" : num_scenarios,
                       "num_words" : num_concepts,
                       "dirichlet_alpha" : topic_param["alpha"]})
 
@@ -124,29 +126,22 @@ class VGParam:
             else:
                 raise Exception("lookup error, unknown word type", word)
 
-        # for each concept, store k strongest scenarios
+        # for each concept index, store:
+        # "scenarios" : list of appropriate scenarios
+        # "weights" : log probabilities logP(concept|scenario)
         concept_scenario = {}
         for columnindex, conceptindex in enumerate(conceptindices_tm):
             topic_weights = term_topic_matrix[:, columnindex]
-            # k_largest_indices = np.argpartition(topic_weights, -self.top_scenarios_per_concept)[-self.top_scenarios_per_concept:]
-            concept_scenario[ conceptindex ] = { "scenario": list(range(len(topic_weights))),
-                                                 "weight": [ w.item() for w in topic_weights ] }
-            # for scenarioindex in k_largest_indices:
-            #     concept_scenario[conceptindex]["scenario"].append( scenarioindex.item())
-            #     concept_scenario[conceptindex]["weight"].append(topic_weights[scenarioindex].item())
-
-        # k0 = list(concept_scenario.keys())[0]
-        # print("HIER0", k0, concept_scenario[k0]["scenario"], concept_scenario[k0]["weight"])
+            # gensim wrapper stores log probabilities, so the weights are already log probabilities
+            concept_scenario[ conceptindex ] =  {"scenario" : list(range(num_scenarios - 1)),
+                                                 "weights" : [ w.item() for w in topic_weights ] }
 
         # sanity check: do we have scenarios for all frequent concepts?
         # if not, assign it the very last scenario, with probability 1
         for i in range(self.vgindex.lastix + 1):
             if i not in concept_scenario:
-                concept_scenario[ i ] = {"scenario" : [ topic_param["num_topics"] ],
+                concept_scenario[ i ] = {"scenario" : [ num_scenarios - 1 ],
                                          "weight" : [ 0.0 ]}
-                # print("missing scenarios for concept", i, concept)
-                # print(concept_scenario[i]["scenario"], concept_scenario[i]["weight"])
-                # sys.exit(0)
 
 
         # done with scenario-concept probs
@@ -156,6 +151,7 @@ class VGParam:
         # word/concept log probabilities:
         # none stored because in the base case,
         # every word just corresponds to a concept with the same name
+        # cloze word IDs -> concept ID -> logprob
         retv.append( { })
         
         

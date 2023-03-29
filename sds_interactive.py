@@ -250,7 +250,7 @@ with zipfile.ZipFile(vgcounts_zipfilename) as azip:
 # Initialization:
 # make wrapper object
 # for creating factor graphs
-print("initializing...")
+print("reading data...")
 
 sds_obj = SDS(vgpath_obj, config["Scenarios"])
 
@@ -285,6 +285,7 @@ topic_obj = sentence_util.TopicInfoUtil(vgpath_obj)
 scen_obj = ImagineScen(vgpath_obj, vgindex_obj)
 
 # imagine attributes from objects
+print("learning attribute predictions...")
 vgiter = vgiterator.VGIterator(vgobjects_attr_rel)
 vec_obj = VectorInterface(vgpath_obj)
 
