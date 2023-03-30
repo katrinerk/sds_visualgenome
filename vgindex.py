@@ -30,7 +30,7 @@ class VgitemIndex:
         if ix > self.lastix:
             # not an object, attribute, or relation: cloze word?
             if self.additional_ix_obj_dict is not None and ix in self.additional_ix_obj_dict:
-                return (self.additional_ix_obj_dict[ix], "obj")
+                return (self.additional_ix_obj_dict[ix], "xxx")
             else:
                 return (None, None)
             

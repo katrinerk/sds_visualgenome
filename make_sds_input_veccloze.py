@@ -30,9 +30,9 @@ from vgpaths import VGPaths
 parser = ArgumentParser()
 parser.add_argument('--output', help="directory to write output to, default: sds_in/veccloze", default = "sds_in/veccloze/")
 parser.add_argument('--vgdata', help="directory with VG data including frequent items, train/test split, topic model", default = "data/")
-parser.add_argument('--pairs_attr', help="Number of attribute cloze pairs to sample, default 40", type = int, default = 5)
-parser.add_argument('--pairs_predarg', help="Number of pred/arg cloze pairs to sample for each role, default 120", type = int, default = 15)
-parser.add_argument('--numsent', help="Number of sentences per attr. cloze pair, default 50", type = int, default = 50)
+parser.add_argument('--pairs_attr', help="Number of attribute cloze pairs to sample, default 40", type = int, default = 1)
+parser.add_argument('--pairs_predarg', help="Number of pred/arg cloze pairs to sample for each role, default 120", type = int, default = 1)
+parser.add_argument('--numsent', help="Number of sentences per attr. cloze pair, default 50", type = int, default = 2)
 parser.add_argument('--top_n_sim', help="Number of top n neighbors from which to select a cloze pair, default 10", type = int, default = 10)
 parser.add_argument('--selpref_relfreq', help="selectional preferences using relative frequency rather than similarity to centroid?  default: False", action = "store_true")
 
@@ -40,6 +40,7 @@ args = parser.parse_args()
 
 ##########################
 # read data
+print("Reading data")
 
 vgpath_obj = VGPaths(vgdata = args.vgdata, sdsdata = args.output)
 
@@ -71,6 +72,8 @@ global_param, scenario_concept_param, word_concept_param, selpref_param = vgpara
 
 ##########################
 # determine word frequencies, for the baseline
+
+print("Determining word frequencies")
 
 vgiter = vgiterator.VGIterator()
 counters = { "attr" : Counter(),
@@ -172,6 +175,8 @@ def each_completed_clozepair(labeltype, first_members_of_clozepairs, labels_to_c
 ##########################
 # make cloze pairs:
 
+print("Making cloze pairs")
+
 gold = { "cloze" : {"binned" : 0, "clozetype" : "att_rel", "words" : { }}}
                                                                                    
 next_wordid = len(vgobjects_attr_rel["objects"]) + len(vgobjects_attr_rel["attributes"]) + len(vgobjects_attr_rel["relations"])
@@ -256,7 +261,7 @@ vgparam_obj.write(global_param, scenario_concept_param, word_concept_param, selp
 # protect occurrences of the target cloze word, and of
 # all predicates that take it as an argument, from
 # random downsampling
-print("Writing sentences")
+print("Determining sentences with cloze pairs")
 
 # given a sentence as VGSentences yields it, "curry" it,
 # combining labels of predicates with either first or second arguments
@@ -266,10 +271,13 @@ def curry_sentence(sentence, arglabel):
     # store mappings dref-> words and head dref -> dependent dref in the argument relation of interest
     dref_words = defaultdict(list)
     drefh_drefd = { }
-    # word labels
+    # word labels:
+    # map discourse referent to set of word labels
     for _, label, dref in words:
         dref_words[ dref].append(label)
     # head/dependent relations
+    # map each head to at most one dependent that it has
+    # in the role of interest (arglabel)
     for _, thisarglabel, dref_h, dref_d in roles:
         # only store for the argument relation of interest
         if thisarglabel == arglabel:
@@ -345,11 +353,12 @@ for sentid, words, roles in vgsent_obj.each_testsentence(vgiter, vgobjects_attr_
         # integrate arguments into predicate labels
         currywords, _ =  curry_sentence((words, roles), role)
         
-        for w, conceptid, dref in currywords:
-            if conceptid in conceptid_clozeid[labeltype]:
+        for w, conceptidpair, dref in currywords:
+            # if this concept ID has a cloze ID for this label type
+            if conceptidpair in conceptid_clozeid[labeltype]:
                 # store the un-curried word as the target word
-                target_words[uncurry_word( (w, conceptid, dref) ) ].append(conceptid_clozeid[labeltype][ conceptid ])
-                clozeids_this_sent.add(conceptid_clozeid[labeltype][ conceptid])
+                target_words[uncurry_word( (w, conceptidpair, dref) ) ].append(conceptid_clozeid[labeltype][ conceptidpair ])
+                clozeids_this_sent.add(conceptid_clozeid[labeltype][ conceptidpair])
 
     # does this sentence contain any of the objects we're manipulating?
     # if not, discard
@@ -364,6 +373,8 @@ for sentid, words, roles in vgsent_obj.each_testsentence(vgiter, vgobjects_attr_
     # and record
     for clozeid in clozeids_this_sent:
         clozeid_sent[ clozeid ].append( (sentid, target_words, nontarget_words, roles) )
+
+
 
 ###
 # possibly downsample test sentences
@@ -386,8 +397,10 @@ for clozeid, sentences in clozeid_sent.items():
     for sentid, twords, nontwords, roles in sentences:
         sentid_sent[sentid] = (twords, nontwords, roles)
         sentid_clozeids[sentid].append(clozeid)
-                                       
 
+
+
+print("Transforming and writing test sentences")
 
 ###
 # now actually transform sentences
@@ -422,10 +435,23 @@ for sentid, sentence in sentid_sent.items():
     
     sentences.append( [sentid, wordliterals, keep_wordliterals, roles])
 
+
+for sentid, wordliterals, keep_wordliterals, roles in sentences:
+    print("---------------")
+    print("HIER", sentid)
+    for _, conceptid, dref in keep_wordliterals:
+        print("target", conceptid, dref)
+    print("__Roles__")
+    for _, pred, drefh, drefd in roles:
+        print("role", pred, drefh, drefd)
+
+
+# sys.exit(0)
+    
         
 ###
 # write sentences to file
-vgsent_obj.write(sentences)
+vgsent_obj.write(sentences, sentlength_cap = None)
 
 
 ###

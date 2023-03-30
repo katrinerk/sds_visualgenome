@@ -20,6 +20,7 @@ parser = ArgumentParser()
 parser.add_argument('sdsinput', help="directory with input to SDS")
 parser.add_argument('sdsoutput', help="directory with output from SDS")
 parser.add_argument('--cloze', help="Look for additional cloze-generated word labels. default: False", action = "store_true")
+parser.add_argument('--allunary', help="Show all unary literals, not just those denoting objects. default: False", action = "store_true")
 
 args = parser.parse_args()
 
@@ -58,7 +59,7 @@ vgindex_obj = VgitemIndex(vgobjects_attr_rel, additional_index_obj_dict = cloze_
 # obtain topic characterizations
 topic_obj = sentence_util.TopicInfoUtil(vgpath_obj)
 
-out_obj = sentence_util.SentencePrinter(vgindex_obj, with_wordliteral_index = False, show_attrel_unary = False)
+out_obj = sentence_util.SentencePrinter(vgindex_obj, with_wordliteral_index = False, show_attrel_unary = args.allunary)
 
 # read sentences
 zipfilename, filename = vgpath_obj.sds_sentence_zipfilename()

@@ -134,7 +134,7 @@ class VGParam:
             topic_weights = term_topic_matrix[:, columnindex]
             # gensim wrapper stores log probabilities, so the weights are already log probabilities
             concept_scenario[ conceptindex ] =  {"scenario" : list(range(num_scenarios - 1)),
-                                                 "weights" : [ w.item() for w in topic_weights ] }
+                                                 "weight" : [ w.item() for w in topic_weights ] }
 
         # sanity check: do we have scenarios for all frequent concepts?
         # if not, assign it the very last scenario, with probability 1
@@ -460,6 +460,7 @@ class VGSentences:
             print("SDS input util warning: empty sentences found", num_empty, "out of", num_empty + num_nonempty)
 
 
+    # set cap to None to no capping
     def write(self, sentences, sentlength_cap = 25):
 
         # sentence literals:
@@ -480,7 +481,7 @@ class VGSentences:
             # print("sentlen", len(words) + len(words_to_keep), "keeping:", len(words_to_keep), "shortening:", len(words))
 
             # cut sentence down to maximum length
-            if len(words) + len(words_to_keep) > sentlength_cap and len(words) > 0:
+            if sentlength_cap is not None and len(words) + len(words_to_keep) > sentlength_cap and len(words) > 0:
                 if len(words_to_keep) >= sentlength_cap:
                     words, roles = self.remove_from_sent(words, roles, additional_words = words_to_keep, literals = words)
                     words = words_to_keep + words
