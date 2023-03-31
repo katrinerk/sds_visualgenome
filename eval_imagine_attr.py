@@ -54,10 +54,18 @@ with zipfile.ZipFile(vgcounts_zipfilename) as azip:
     with azip.open(vgcounts_filename) as f:
         vgobjects_attr_rel = json.load(f)
 
+###
+# read vectors
+vec_obj = VectorInterface(vgpath_obj)
+
+available_objects = [o for o in vgobjects_attr_rel["objects"] if o in vec_obj.object_vec]
+missing = len(vgobjects_attr_rel["objects"]) - len(available_objects)
+if missing > 0:
+    print("frequent objects without vectors:", missing, "out of", len(vgobjects_attr_rel["objects"]))
 
 # randomly sample objects for the training part
-training_objectlabels = random.sample(vgobjects_attr_rel["objects"], int(args.trainperc * len(vgobjects_attr_rel["objects"])))
-test_objectlabels = [ o for o in vgobjects_attr_rel["objects"] if o not in training_objectlabels]
+training_objectlabels = random.sample(available_objects, int(args.trainperc * len(available_objects)))
+test_objectlabels = [ o for o in available_objects if o not in training_objectlabels]
 
 ###
 # count object/attribute frequencies
@@ -73,19 +81,6 @@ testset = set(traintest_split["test"])
 
 vgiter = vgiterator.VGIterator(vgobjects_attr_rel)
 
-###
-# read vectors
-vec_obj = VectorInterface(vgpath_obj)
-
-# how many vectors are missing?
-missing = 0
-for obj in training_objectlabels:
-    if obj not in vec_obj.object_vec:
-        missing += 1
-
-if missing > 0:
-    print("Missing vectors for", missing, "out of", len(training_objectlabels), "objects")
-
 print("Training and applying PLSR")
 
 attr_obj =  ImagineAttr(vgiter, vec_obj, training_objectlabels = training_objectlabels, img_ids = trainset, num_attributes = args.num_att, num_plsr_components = args.plsr_components)
@@ -93,10 +88,10 @@ attr_obj =  ImagineAttr(vgiter, vec_obj, training_objectlabels = training_object
 
 
 # predictions for training objects
-Ypredict_train, Ytrain, training_used_object_labels = attr_obj.predict_forobj(training_objectlabels)
+Ypredict_train, Ygoldtrain, training_used_object_labels = attr_obj.predict_forobj(training_objectlabels)
 
 # prediction for test objects
-Ypredict_test, Ytest, test_used_object_labels = attr_obj.predict_forobj(test_objectlabels)
+Ypredict_test, Ygoldtest, test_used_object_labels = attr_obj.predict_forobj(test_objectlabels)
 
 
 ##
@@ -110,8 +105,8 @@ with open(outpath, "w") as outf:
         
         print("-----------\nObject:", objlabel, "\n", file = outf)
         
-        print("Gold:", file = outf)
-        for a, p in sorted(zip(attr_obj.attributelabels, attr_obj.obj_att_prob[objlabel]), key = lambda p:p[1], reverse = True):
+        print("Gold (top 20):", file = outf)
+        for a, p in sorted(zip(attr_obj.attributelabels, attr_obj.obj_att_prob[objlabel]), key = lambda p:p[1], reverse = True)[:20]:
             if p > 0.0:
                 print("\t", a, ":", p, file = outf)
         print(file = outf)
@@ -128,9 +123,9 @@ print("Evaluating")
 # first evaluation:
 # overall quality of feature vectors for test objects:
 # Spearman
-def average_spearman(model_lists, gold_lists, single_gold_list = False):
-    if single_gold_list:
-        rhos = [ stats.spearmanr(mi, gold_lists).statistic for mi in model_lists]
+def average_spearman(model_lists, gold_lists, single_list = False):
+    if single_list:
+        rhos = [ stats.spearmanr(model_lists, gl).statistic for gl in gold_lists]
     else:
         rhos = [ stats.spearmanr(mi, gi).statistic for mi, gi in zip(model_lists, gold_lists)]
         
@@ -145,12 +140,12 @@ Ypredict_test = Ypredict_test.tolist()
 # frequency baseline weights
 baseline_weights = [count for _, count in attr_obj.att_count.most_common(args.num_att)]
 
-print("Average Spearman's rho for prediction on Training objects:", round(average_spearman(Ypredict_train, Ytrain), 3),
-      "on Test objects:", round(average_spearman(Ypredict_test, Ytest), 3))
+print("Average Spearman's rho for prediction on Training objects:", round(average_spearman(Ypredict_train, Ygoldtrain), 3),
+      "on Test objects:", round(average_spearman(Ypredict_test, Ygoldtest), 3))
 print("Average Spearman's rho, frequency baseline: Training objects:",
-      round(average_spearman(Ypredict_train, baseline_weights, single_gold_list = True), 3),
+      round(average_spearman(baseline_weights, Ygoldtrain, single_list = True), 3),
       "Test objects:", 
-      round(average_spearman(Ypredict_test, baseline_weights, single_gold_list = True), 3))
+      round(average_spearman(baseline_weights, Ygoldtest, single_list = True), 3))
 ##
 # second evaluation:
 # for individual sentences from the test data,

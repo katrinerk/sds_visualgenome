@@ -84,7 +84,7 @@ class ImagineAttr:
         self.vec_obj = vec_obj
 
         # remember which object number (ref) goes with which object labels
-        #image id -> objref -> object
+        # image id -> objref -> object
         # both training and test, as we need gold info for test objects
 
         imgid_obj = { }
@@ -167,7 +167,7 @@ class ImagineAttr:
         used_object_labels  = [ ]
 
         for obj in objectlabels:
-            if obj in self.vec_obj.object_vec:
+            if obj in self.vec_obj.object_vec and obj in self.obj_att_prob:
                 X.append(self.vec_obj.object_vec[obj])
                 Y.append( self.obj_att_prob[obj] )
                 used_object_labels.append( obj )

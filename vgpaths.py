@@ -27,11 +27,12 @@ class VGPaths:
         self.vg_subpath_obj = config["VisualGenome"]["VGOBJECTS"]
         self.vg_subpath_attr = config["VisualGenome"]["VGATTRIB"]
         self.vg_subpath_rel = config["VisualGenome"]["VGREL"]
+
+        self.vectorpath = config["VisualGenome"]["VECPATH"]
         
         self.datapath = vgdata
         self.sdsdatapath = sdsdata
         self.sdsoutpath = sdsout
-        self.vg_manipulated_path = "changedvg/"
 
 
     # location of visual genome objects file
@@ -78,7 +79,7 @@ class VGPaths:
 
     # where to find VG-based vectors
     def vg_vecfilename(self, write = False):
-        pathname = os.path.join(self.datapath, "ext2vec.dm")
+        pathname = self.vectorpath
         if write:
             return get_output_path(pathname)
         else:
