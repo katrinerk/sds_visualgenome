@@ -10,10 +10,11 @@ pgmax: need to install under Python 3.8
 In the directory with the source code, make a file `settings.txt` with the following content: (Settings below show use of Visual Genome 1.2 throughout, but should also work with 1.3)
 ```
 [VisualGenome]
-VGPATH = <path to visual genome in your system>
+VGPATH = <path to visual genome>
 VGOBJECTS = <relative path to objects zip, v1_2/objects_v1_2.json.zip>
 VGATTRIB = <relative path to attrib. zip, v1_2/attributes.json.zip>
 VGREL = <relative path to rel. zip, v1_2/relationships_v1_2.json.zip> 
+VECPATH = <path to VG-based skipgram vectors>
 [Parameters]
 VGFreqCutoffObj = <frequency cutoff for objects in VG, suggestion 50>
 VGFreqCutoffAtt= <frequency cutoff for attributes in VG, suggestion 50>
