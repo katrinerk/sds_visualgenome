@@ -91,7 +91,7 @@ for img, obj in vgobj.each_image_objects(img_ids = trainset):
 # most_common() without argument returns all key/count pairs, most frequent first.
 # replace object names by object IDs.
 baseline_objectid_ranking = [vgindex_obj.o2ix(objectname) for objectname, _ in objname_count.most_common()]
-
+baseline_objectid_logprob = np.log(np.array([count for _, cont in objname_count.most_common()]) / sum(objname_count.values()))
 
 ##########################
 # for each scenario, obtain a numpy array
@@ -102,57 +102,9 @@ print("reading scenario/concept probabilities")
 
 scen_obj = ImagineScen(vgpath_obj, vgindex_obj)
 
-# # read scenario/topic data from gensim.
-# # format: one row per topic, one column per word, log probabilities
-# gensim_zipfilename, overall_filename, topic_filename, word_filename, topicword_filename = vgpath_obj.gensim_out_zip_and_filenames()
-# with zipfile.ZipFile(gensim_zipfilename) as azip:
-#     # term-topic matrix
-#     with azip.open(topicword_filename) as f:
-#         term_topic_matrix = json.load(f)
-
-#     # ordered list of words as they appear in topics,
-#     # need to be mapped to IDs
-#     # ordered list of words as they appear in topics. need to be mapped to concepts and concept indices
-#     with azip.open(word_filename) as f:
-#         topic_wordlist = json.load(f)
-
-# # make list of indices of gensim words that are objects,
-# # and map object names ot their IDs
-# indices_of_objects = [ ]
-# object_ids = [ ]
-# for index, word in enumerate(topic_wordlist):
-#     if word[:3] =="obj":
-#         wordid = vgindex_obj.o2ix(word[3:])
-#         if wordid is None:
-#             raise Exception("lookup error for topic word, object", word[3:])
-
-#         object_ids.append(wordid)
-#         indices_of_objects.append(index)
-
-# indices_of_objects = np.array(indices_of_objects)
-
-# # for each scenario, restrict to objects, renormalize, store
-# scenario_logprobs = [ ]
-# for sclp in term_topic_matrix:
-    
-#     a = np.array(sclp)
-    
-#     # select only columns that describe an object
-#     a = a[ indices_of_objects ]
-
-#     # renormalize
-#     normalizer = np.log(np.exp(a).sum())
-#     a = a - normalizer
-#     # scenario_logprobs: scenario log probabilities, in order of scenarios
-#     scenario_logprobs.append(a)
 
 topic_obj = sentence_util.TopicInfoUtil(vgpath_obj)
 
-# for sc, logprobs in enumerate(scenario_logprobs):
-    
-#     print("----")
-#     print(topic_obj.topic_info(sc))
-#     print([vgindex_obj.ix2l(o)[0] for o in np.array(object_ids)[logprobs.argsort()][::-1][:10]])
     
 #################################
 # evaluation: first do the actual prediction of additional objects based on the MAP scenario assignment,
@@ -177,6 +129,13 @@ def highestcorrect(predicted, gold):
     for ix, prediction in enumerate(predicted):
         if prediction in gold:
             return ix
+
+# perplexity for a series of observations.
+# but keep conditional probability conditioned
+# only on the seen document not the other unseen observations
+def perplexity(objects, predicted_logprob, new_objects):
+    return math.exp(- (1 / len(new_objects)) * sum([ logprob for o, logprob in zipped(objects, predicted_logprob) if o in new_objects]))
+    
         
 #############
 # iterate over sentences, retrieve gold hidden objects
@@ -213,9 +172,10 @@ random.seed(6543)
 
 print("Evaluating")
 
-# sentence ID -> (model average precision, predicted average precision)
+# sentence ID -> model average precision, rank of highest correct prediction, perplexity
 sentid_averageprecision = { }
 sentid_highestcorrect = { }
+sentid_perplexity = { }
 
 # which sentences to sample for inspection?
 sentence_ids_to_inspect = random.sample(list(sentid_sent.keys()), args.num_inspect)
@@ -228,7 +188,7 @@ with open(outpath, "w") as outf:
     
     for sentence_id, sentence, gold_hidden_objectids, scenarios_this_sent in each_sentence(model_data, golddata, sentid_sent):
 
-        model_objectid_ranking = scen_obj.predict_objectids(scenarios_this_sent)
+        model_objectid_ranking, model_objectid_logprob = scen_obj.predict_objectids(scenarios_this_sent)
 
         # print("gold hidden objects", [vgindex_obj.ix2l(o)[0] for o in gold_hidden_objectids])
         # print("scenarios", sorted(scenarios_this_sent))
@@ -243,6 +203,9 @@ with open(outpath, "w") as outf:
 
         sentid_highestcorrect[ sentence_id] = (highestcorrect(model_objectid_ranking, gold_hidden_objectids),
                                                highestcorrect(baseline_objectid_ranking, gold_hidden_objectids) )
+
+        sentid_perplexity[ sentence_id ] = ( perplexity(model_objectid_ranking, model_objectid_logprob, gold_hidden_objectids),
+                                             perplexity(baseline_objectid_ranking, baseline_objectid_logprob, gold_hidden_objectids) )
                 
 
         if sentence_id in sentence_ids_to_inspect:
@@ -266,11 +229,16 @@ with open(outpath, "w") as outf:
                 print(sc, topic_obj.topic_info(sc), file = outf)
             
             print("Average precision:", sentid_averageprecision[sentence_id][0], file = outf)
+            print("Perplexity:", sentid_perplexity[sentence_id][0], file = outf)
             print(file = outf)
 
 # compute mean average precision and report it
 print("Mean average precision:", round(sum([m for m, b in sentid_averageprecision.values()]) / len(sentid_averageprecision), 3),
       "Baseline mean average precision:", round(sum([b for m, b in sentid_averageprecision.values()]) / len(sentid_averageprecision), 3))
+
+# compute mean perplexity and report it
+print("Average perplexity:", round(sum([m for m, b in sentid_perplexity.values()]) / len(sentid_perplexity), 3),
+      "Baseline average perplexity:", round(sum([b for m, b in sentid_perplexity.values()]) / len(sentid_perplexity), 3))
 
 
 # print("Average rank of highest correct:", sum([m for m, b in sentid_highestcorrect.values()]) / len(sentid_highestcorrect),

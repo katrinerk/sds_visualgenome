@@ -30,9 +30,9 @@ from vgpaths import VGPaths
 parser = ArgumentParser()
 parser.add_argument('--output', help="directory to write output to, default: sds_in/veccloze", default = "sds_in/veccloze/")
 parser.add_argument('--vgdata', help="directory with VG data including frequent items, train/test split, topic model", default = "data/")
-parser.add_argument('--pairs_attr', help="Number of attribute cloze pairs to sample, default 40", type = int, default = 1)
-parser.add_argument('--pairs_predarg', help="Number of pred/arg cloze pairs to sample for each role, default 120", type = int, default = 1)
-parser.add_argument('--numsent', help="Number of sentences per attr. cloze pair, default 50", type = int, default = 2)
+parser.add_argument('--pairs_objattr', help="Number of obj or attribute cloze pairs to sample, default 40", type = int, default = 40)
+parser.add_argument('--pairs_predarg', help="Number of pred/arg cloze pairs to sample for each role, default 120", type = int, default = 120)
+parser.add_argument('--numsent', help="Number of sentences per attr. cloze pair, default 50", type = int, default = 50)
 parser.add_argument('--top_n_sim', help="Number of top n neighbors from which to select a cloze pair, default 10", type = int, default = 10)
 parser.add_argument('--selpref_relfreq', help="selectional preferences using relative frequency rather than similarity to centroid?  default: False", action = "store_true")
 
@@ -76,15 +76,15 @@ global_param, scenario_concept_param, word_concept_param, selpref_param = vgpara
 print("Determining word frequencies")
 
 vgiter = vgiterator.VGIterator()
-counters = { "attr" : Counter(),
+counters = { "object" : Counter(),
+             "attr" : Counter(),
              "predarg0" : Counter(),
              "predarg1" : Counter()
              }
 
 # count attributes
 for img, frequent_it in vgiter.each_image_attributes(img_ids = trainset):
-    for label in frequent_it:
-        counters["attr"][ label ] += 1
+    counters["attr"].update(frequent_it)
 
 
 # collect labels of potential arguments
@@ -94,6 +94,7 @@ for imgid, objects in vgiter.each_image_objects_full(img_ids = trainset):
     img_objid_label[imgid] = { }
     for objid, names in objects:
         img_objid_label[imgid][objid] = names
+        counters["object"].update(names)
 
 # count pred/arg0, pred/arg1 pairs
 for imgid, rel_arg in vgiter.each_image_relations_full(img_ids = trainset):
@@ -112,7 +113,10 @@ for imgid, rel_arg in vgiter.each_image_relations_full(img_ids = trainset):
 # usable labels:
 # need to be frequent, AND have a vector, AND have scenarios
 def usable_labels(labeltype, frequent_labels, vgindex_obj, vec_obj, scenario_concept_param):
-    if labeltype == "attr":
+    if labeltype == "object":
+        return [ell for ell in frequent_labels["objects"] if ell in vec_obj.object_vec.keys()]
+    
+    elif labeltype == "attr":
         # attribute label that is frequent, has a vector and has a scenario
         return [ell for ell in frequent_labels["attributes"] if ell in vec_obj.attrib_vec.keys() and\
                 vgindex_obj.a2ix(ell) in scenario_concept_param]
@@ -133,12 +137,8 @@ def each_completed_clozepair(labeltype, first_members_of_clozepairs, labels_to_c
     # for each first member of a cloze pair, find a second member
     previously_chosen= set(first_members_of_clozepairs)
 
-    # count = 0
     for ell1 in first_members_of_clozepairs:
 
-        # count += 1
-        # if count > 10:
-        #     break
         # rank all other words of the same category by similarity to ell1
         neighbors = vec_obj.ranked_sims(ell1, labeltype)
 
@@ -177,14 +177,14 @@ def each_completed_clozepair(labeltype, first_members_of_clozepairs, labels_to_c
 
 print("Making cloze pairs")
 
-gold = { "cloze" : {"binned" : 0, "clozetype" : "att_rel", "words" : { }}}
+gold = { "cloze" : {"binned" : 0, "clozetype" : "vecbased", "words" : { }}}
                                                                                    
 next_wordid = len(vgobjects_attr_rel["objects"]) + len(vgobjects_attr_rel["attributes"]) + len(vgobjects_attr_rel["relations"])
 # mapping concept ID -> cloze word id
-conceptid_clozeid = { "attr" : {}, "predarg0": { }, "predarg1" : { }}
+conceptid_clozeid = { "object" : { }, "attr" : {}, "predarg0": { }, "predarg1" : { }}
 
 
-for labeltype, num_pairs_to_choose in [("attr", args.pairs_attr), ("predarg0", args.pairs_predarg), ("predarg1", args.pairs_predarg)]:
+for labeltype, num_pairs_to_choose in [("object", args.pairs_objattr), ("attr", args.pairs_objattr), ("predarg0", args.pairs_predarg), ("predarg1", args.pairs_predarg)]:
 
     # determine labels that can go into a cloze pair
     all_labels = usable_labels(labeltype, vgobjects_attr_rel, vgindex_obj, vec_obj, scenario_concept_param)
@@ -196,11 +196,18 @@ for labeltype, num_pairs_to_choose in [("attr", args.pairs_attr), ("predarg0", a
         
         pair = sorted([ell1, ell2])
 
-        if labeltype == "attr":
+        if labeltype == "object":
+            pair_ids = [vgindex_obj.o2ix(ell) for ell in pair]
+            concept_ids = pair_ids
+            pair_freq = [counters["object"][ell] for ell in pair]
+            clozeword = "|".join(pair)
+            
+        elif labeltype == "attr":
             pair_ids = [vgindex_obj.a2ix(ell) for ell in pair]
             concept_ids = pair_ids
             pair_freq = [counters["attr"][ell] for ell in pair]
             clozeword = "|".join(pair)
+            
         else:
             pair_ids = [(vgindex_obj.r2ix(ell[0]), vgindex_obj.o2ix(ell[1])) for ell in pair]
             concept_ids = [ p for p, a in pair_ids]
@@ -308,21 +315,6 @@ def uncurry_word(word):
 
     return (w, labelpair[0], dref)
 
-# # does this word literal match one of the given concept IDs? return all matches
-# # if integer: label has to be member of list of concept IDs
-# # if list: all list members in the list of labels that is in  the list of concept IDs
-# def wordliteral_label_matches(label_or_labels, conceptids):
-
-#     if isinstance(label_or_labels, list):
-#         return [ell for ell in label_or_labels if ell in conceptids]
-#     elif isinstance(label_or_labels, int):
-#         if label_or_labels in conceptids:
-#             return [label_or_labels]
-#         else:
-#             return [ ]
-#     else:
-#         return [ ]
-
 ###
 
 vgsent_obj = VGSentences(vgpath_obj)
@@ -339,12 +331,13 @@ for sentid, words, roles in vgsent_obj.each_testsentence(vgiter, vgobjects_attr_
     clozeids_this_sent = set()
     
 
-    # one pass over the words without currying, for attributes    
+    # one pass over the words without currying, for objects and attributes    
     for w, conceptid, dref in words:
         # target word
-        if conceptid in conceptid_clozeid["attr"]:
-            target_words[(w, conceptid, dref) ].append(conceptid_clozeid["attr"][ conceptid] )
-            clozeids_this_sent.add(conceptid_clozeid["attr"][ conceptid])
+        for labeltype in ["object", "attr"]:
+            if conceptid in conceptid_clozeid[labeltype]:
+                target_words[(w, conceptid, dref) ].append(conceptid_clozeid[labeltype][ conceptid] )
+                clozeids_this_sent.add(conceptid_clozeid[labeltype][ conceptid])
 
 
     # one pass for predicate/arg0, one for arg1
@@ -436,17 +429,16 @@ for sentid, sentence in sentid_sent.items():
     sentences.append( [sentid, wordliterals, keep_wordliterals, roles])
 
 
-for sentid, wordliterals, keep_wordliterals, roles in sentences:
-    print("---------------")
-    print("HIER", sentid)
-    for _, conceptid, dref in keep_wordliterals:
-        print("target", conceptid, dref)
-    print("__Roles__")
-    for _, pred, drefh, drefd in roles:
-        print("role", pred, drefh, drefd)
+# for sentid, wordliterals, keep_wordliterals, roles in sentences:
+#     print("---------------")
+#     print("HIER", sentid)
+#     for _, conceptid, dref in keep_wordliterals:
+#         print("target", conceptid, dref)
+#     print("__Roles__")
+#     for _, pred, drefh, drefd in roles:
+#         print("role", pred, drefh, drefd)
 
 
-# sys.exit(0)
     
         
 ###

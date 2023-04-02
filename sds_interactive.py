@@ -184,7 +184,7 @@ q stop analyzing this sentence:
         print("\nImagining additional objects based on scenarios in sentence.", sentence_id)
 
         scenario_list = mapresult["scenario"]
-        model_objectid_ranking = self.scen_obj.predict_objectids(scenario_list)
+        model_objectid_ranking, _ = self.scen_obj.predict_objectids(scenario_list)
         print("Top", n, ":")
         print(", ".join(self.vgindex_obj.ix2l(oid)[0] for oid in model_objectid_ranking[:n]))
         print()

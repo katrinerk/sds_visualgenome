@@ -65,18 +65,22 @@ class ImagineScen:
     def predict_objectids(self, scenario_list):
         # obtain scenario probabilities within the scenario list
         sc_freq = Counter(scenario_list)
+        # sc_logprob: dictionary scenario ID -> log probability of this scenario in this sentence
         sc_logprob = dict( (s, math.log( sc_freq[s] / sum(sc_freq.values()))) for s in sc_freq.keys() )
 
-        # sc_logprob: dictionary scenario ID -> log probability of this scenario in this sentence
         # scenario_logprobs: list where the i-th entry is for the i-th scenario,
         #    each entry is a numpy array of object log probabilities
-        # compute: sum_{s scenario in this sentence} this_sentence_scenarioprob(s) * object_probs(s)
+        # compute: sum_{s scenario in this sentence} this_sentence_scenarioprob(s) + object_logprobs(s)
         # again a numpy array of object log probabilities
         objectid_logprob = np.sum([ sc_logprob[s] + self.scenario_logprobs[s] for s in sc_logprob.keys()], axis = 0)
 
         # sort object IDs by their log probability in objectid_logprob,
         # largest first
-        return np.array(self.object_ids)[objectid_logprob.argsort()][::-1]        
+        indices_smallest_to_largest = objectid_logprob.argsort()
+        sorted_object_ids = np.array(self.object_ids)[indices_smallest_to_largest][::-1]
+        sorted_logprobs = objectid_logprob[indices_smallest_to_largest][::-1]
+
+        return (sorted_object_ids, sorted_logprobs)
 
 class ImagineAttr:
     def __init__(self, vgiter, vec_obj, training_objectlabels = None, img_ids = None, num_attributes = 500, num_plsr_components = 100):

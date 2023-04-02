@@ -122,7 +122,7 @@ class VectorInterface:
     # where type = object, attr, predarg0, predarg1
     def ranked_sims(self, label, elltype):
         if elltype == "object":
-            simfunc = self.object_kv.similar_by_key()
+            simfunc = self.object_kv.similar_by_key
             keydict = self.object_kv_index_key
             tlabel = label
         

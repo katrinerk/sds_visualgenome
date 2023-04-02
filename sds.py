@@ -653,7 +653,13 @@ def main():
 
         # do the inference:
         # max-product algorithm
-        thismap = fg.map_inference()
+        try:
+            thismap = fg.map_inference()
+        except Exception:
+            print("Error in procerssing sentence, skipping:", sentence_id)
+            print(sentence)
+            continue
+        
         results.append({"sentence_id" : sentence_id, "MAP" : thismap})
 
         # stop timer
