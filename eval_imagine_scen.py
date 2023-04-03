@@ -91,7 +91,7 @@ for img, obj in vgobj.each_image_objects(img_ids = trainset):
 # most_common() without argument returns all key/count pairs, most frequent first.
 # replace object names by object IDs.
 baseline_objectid_ranking = [vgindex_obj.o2ix(objectname) for objectname, _ in objname_count.most_common()]
-baseline_objectid_logprob = np.log(np.array([count for _, cont in objname_count.most_common()]) / sum(objname_count.values()))
+baseline_objectid_logprob = np.log(np.array([count for _, count in objname_count.most_common()]) / sum(objname_count.values()))
 
 ##########################
 # for each scenario, obtain a numpy array
@@ -134,7 +134,7 @@ def highestcorrect(predicted, gold):
 # but keep conditional probability conditioned
 # only on the seen document not the other unseen observations
 def perplexity(objects, predicted_logprob, new_objects):
-    return math.exp(- (1 / len(new_objects)) * sum([ logprob for o, logprob in zipped(objects, predicted_logprob) if o in new_objects]))
+    return math.exp(- (1 / len(new_objects)) * sum([ logprob for o, logprob in zip(objects, predicted_logprob) if o in new_objects]))
     
         
 #############
@@ -228,7 +228,7 @@ with open(outpath, "w") as outf:
             for sc, _ in Counter(scenarios_this_sent).most_common(3):
                 print(sc, topic_obj.topic_info(sc), file = outf)
             
-            print("Average precision:", sentid_averageprecision[sentence_id][0], file = outf)
+            print("\n\nAverage precision:", sentid_averageprecision[sentence_id][0], file = outf)
             print("Perplexity:", sentid_perplexity[sentence_id][0], file = outf)
             print(file = outf)
 
@@ -240,8 +240,10 @@ print("Mean average precision:", round(sum([m for m, b in sentid_averageprecisio
 print("Average perplexity:", round(sum([m for m, b in sentid_perplexity.values()]) / len(sentid_perplexity), 3),
       "Baseline average perplexity:", round(sum([b for m, b in sentid_perplexity.values()]) / len(sentid_perplexity), 3))
 
+print("Average rank of highest correct:", sum([m for m, b in sentid_highestcorrect.values()]) / len(sentid_highestcorrect),
+      "Baseline average rank of highest correct", sum([b for m, b in sentid_highestcorrect.values()]) / len(sentid_highestcorrect))
 
-# print("Average rank of highest correct:", sum([m for m, b in sentid_highestcorrect.values()]) / len(sentid_highestcorrect),
-#      "Baseline average rank of highest correct", sum([b for m, b in sentid_highestcorrect.values()]) / len(sentid_highestcorrect))
+print()
+
             
                 
