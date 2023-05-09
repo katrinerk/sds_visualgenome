@@ -155,9 +155,9 @@ topic_obj = sentence_util.TopicInfoUtil(vgpath_obj)
 # dictionary of cloze words
 cloze_dict = { }
 for wordid_s in golddata["cloze"]["words"].keys():
-    cloze_dict[ int(wordid_s)] = golddata["cloze"]["words"][wordid_s]["word"]
+    cloze_dict[ int(wordid_s)] = (golddata["cloze"]["words"][wordid_s]["word"], "obj")
 
-vgindex_obj = VgitemIndex(vgobjects_attr_rel, additional_index_obj_dict = cloze_dict)
+vgindex_obj = VgitemIndex(vgobjects_attr_rel, additional_dict = cloze_dict)
     
 
 for clozeword_id in clozeword_model_acc.keys():

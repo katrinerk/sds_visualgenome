@@ -3,7 +3,7 @@
 # and indices to be used within the factor graph
 
 class VgitemIndex:
-    def __init__(self, object_attr_rel_lists, additional_index_obj_dict = None):
+    def __init__(self, object_attr_rel_lists, additional_dict = None):
         self.object_attr_rel_lists = object_attr_rel_lists
         self.num_objects = len(object_attr_rel_lists["objects"])
         self.firstattr = len(object_attr_rel_lists["objects"])
@@ -14,7 +14,8 @@ class VgitemIndex:
         self.attrix = dict((c, self.firstattr + i) for i, c in enumerate(object_attr_rel_lists["attributes"]))
         self.relix = dict((c, self.firstrel + i) for i, c in enumerate(object_attr_rel_lists["relations"]))
 
-        self.additional_ix_obj_dict = additional_index_obj_dict
+        # dictionary: index -> (label, type)
+        self.additional_dict = additional_dict
 
 
     def o2ix(self, o):
@@ -29,8 +30,8 @@ class VgitemIndex:
     def ix2l(self, ix):
         if ix > self.lastix:
             # not an object, attribute, or relation: cloze word?
-            if self.additional_ix_obj_dict is not None and ix in self.additional_ix_obj_dict:
-                return (self.additional_ix_obj_dict[ix], "xxx")
+            if self.additional_dict is not None and ix in self.additional_dict:
+                return self.additional_dict[ix]
             else:
                 return (None, None)
             

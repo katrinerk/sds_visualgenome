@@ -131,9 +131,11 @@ q stop analyzing this sentence:
         print("Marginal probabilities:\n")
         marginals = fg.marginal_inference()
         # concept marginals
-        print("Focus literal concept marginals:")
+        print("Focus literal concept marginals (up to 20):")
+        # print marginal probabilities, but restrict to top 20
         mconc = marginals["concept"][focusliteral_index]
-        for conceptid_str, prob in mconc.items():
+        mconc_items_top = sorted(mconc.items(), key  = lambda p:p[1], reverse = True)[:20]
+        for conceptid_str, prob in mconc_items_top:
              print("\t", self.vgindex_obj.ix2l(int(conceptid_str))[0], ":", round(prob, 3))
         print("\nFocus literal scenario marginals:")
         mscen = marginals["scenario"][focusliteral_index]
@@ -149,15 +151,15 @@ q stop analyzing this sentence:
         print("Most likely valuations for each possible concept for the focus literal:")
         # MAP goes first
         logpotential = fg.readoff_valuation(mapresult)
-        potential = 0 if logpotential is None else math.exp(logpotential)
+        # potential = 0 if logpotential is None else math.exp(logpotential)
             
         mapconcept = mapresult["concept"][focusliteral_index]
         print("Conc.", self.vgindex_obj.ix2l(mapconcept)[0],
               "Scen", mapresult["scenario"][focusliteral_index],
-              "Potential", potential)
+              "Log potential", logpotential)
 
-        # now all others, sorted by probability, highest first
-        for conceptid_str, prob in sorted(mconc.items(), key  = lambda p:p[1], reverse = True):
+        # now all others, sorted by probability, highest first.
+        for conceptid_str, prob in mconc_items_top:
             this_conceptid = int(conceptid_str)
             if this_conceptid == mapconcept:
                 # we've already printed the potential for the MAP
@@ -171,11 +173,11 @@ q stop analyzing this sentence:
 
             # then compute the potential of that valuation on the *main*, unaltered factor graph
             thislogp = fg.readoff_valuation(this_map)
-            thispotential = 0 if thislogp is None else math.exp(thislogp)
+            # thispotential = 0 if thislogp is None else math.exp(thislogp)
                 
             print("Conc.", self.vgindex_obj.ix2l(this_conceptid)[0],
                   "Scen.", this_map["scenario"][focusliteral_index],
-                  "Potential", thispotential)
+                  "Log potential", thislogp)
                 
 
         print()
@@ -241,16 +243,16 @@ config.read("settings.txt")
 
 vgpath_obj = VGPaths(sdsdata = args.input)
 
-vgcounts_zipfilename, vgcounts_filename = vgpath_obj.vg_counts_zip_and_filename()
-with zipfile.ZipFile(vgcounts_zipfilename) as azip:
-    with azip.open(vgcounts_filename) as f:
-        vgobjects_attr_rel = json.load(f)
-
 ########3
 # Initialization:
 # make wrapper object
 # for creating factor graphs
 print("reading data...")
+
+vgcounts_zipfilename, vgcounts_filename = vgpath_obj.vg_counts_zip_and_filename()
+with zipfile.ZipFile(vgcounts_zipfilename) as azip:
+    with azip.open(vgcounts_filename) as f:
+        vgobjects_attr_rel = json.load(f)
 
 sds_obj = SDS(vgpath_obj, config["Scenarios"])
 
@@ -271,12 +273,13 @@ if args.cloze:
         raise Exception("Was expecting cloze info in gold data", zipfilename)
 
     # dictionary of cloze words
-    cloze_dict = dict( (int(wordid_s), golddata["cloze"]["words"][wordid_s]["word"]) for wordid_s in golddata["cloze"]["words"].keys())
+    cloze_dict = dict( (int(wordid_s), (golddata["cloze"]["words"][wordid_s]["word"], golddata["cloze"]["words"][wordid_s].get("ctype", "obj"))) \
+                            for wordid_s in golddata["cloze"]["words"].keys())
 else:
     cloze_dict = None
 
 # mapping between labels and label indices
-vgindex_obj = VgitemIndex(vgobjects_attr_rel, additional_index_obj_dict = cloze_dict)
+vgindex_obj = VgitemIndex(vgobjects_attr_rel, additional_dict = cloze_dict)
 
 # obtain topic characterizations
 topic_obj = sentence_util.TopicInfoUtil(vgpath_obj)
