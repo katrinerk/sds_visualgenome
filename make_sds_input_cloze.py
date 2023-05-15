@@ -104,7 +104,7 @@ print("Determining cloze word pairs")
 #######
 # data structure for gold info:
 # store under "cloze" for the task, mark "binned" as true
-gold = { "cloze" : {"binned" : 1, "clozetype" : "objects", "words" : { } } }
+gold = { "cloze" : {"clozetype" : "binned", "words" : { } } }
 
 ####
 # select object pairs

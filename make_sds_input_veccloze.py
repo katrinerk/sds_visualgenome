@@ -113,11 +113,19 @@ use_testsentences = random.sample(testsentences, args.numsent)
 
 simlevels = { 0 : [0, 14], 1:[15, 29], 2:[30, 44], 3:[45, 1000000]}
 
+# count how often each argument appears in the pred/arg entries in the vectors
+# so that we can later discard pred/arg pairs where the argument only ever
+# appears once (because then we'll never find a pair pred'/arg with the same arg
+# but different pred')
+arg0counter = Counter([a for _, a in vec_obj.predarg0_vec.keys()])
+arg1counter = Counter([a for _, a in vec_obj.predarg1_vec.keys()])
+
+
 ##
 # make list of candidates for cloze.
 # objects, attributes: use as is.
 # relations: make two curried variants, with each argument
-def candidate_words(words, roles, vgix_obj, frequent_labels, vec_obj, scenario_concept_param):
+def candidate_words(words, roles, vgix_obj, frequent_labels, vec_obj, scenario_concept_param, arg0counter, arg1counter):
     ###
     # store mappings dref-> object labels
     dref_obj = defaultdict(list)
@@ -168,8 +176,12 @@ def candidate_words(words, roles, vgix_obj, frequent_labels, vec_obj, scenario_c
                     continue
 
                 # retain only objects that have a vector together with the predicate
-                predarg0s = [ ("predarg0", conceptlabel, alabel) for alabel in dref_obj[ arg0_drefh_drefd[ dref ]] if (conceptlabel, alabel) in  vec_obj.predarg0_vec.keys()]
-                predarg1s = [ ("predarg1", conceptlabel, alabel) for alabel in dref_obj[ arg1_drefh_drefd[ dref]] if (conceptlabel, alabel) in vec_obj.predarg1_vec.keys()]
+                # and that appear with at least 2 predicates in the vectors list
+                predarg0s = [ ("predarg0", conceptlabel, alabel) for alabel in dref_obj[ arg0_drefh_drefd[ dref ]] \
+                                  if (conceptlabel, alabel) in  vec_obj.predarg0_vec.keys() and arg0counter[alabel] >= 10]
+                predarg1s = [ ("predarg1", conceptlabel, alabel) for alabel in dref_obj[ arg1_drefh_drefd[ dref]] \
+                                  if (conceptlabel, alabel) in vec_obj.predarg1_vec.keys() and arg1counter[alabel] >= 10]
+
 
                 if len(predarg0s) > 0 or len(predarg1s) > 0:
                     retv.append( (ctype, predarg0s + predarg1s, wordix) )
@@ -181,25 +193,37 @@ def candidate_words(words, roles, vgix_obj, frequent_labels, vec_obj, scenario_c
 def sample_clozepair(wordtype, wordinfo, simlevel,simlevel_vals, vec_obj, vgix_obj):
     
     # determine ranked similarities
-    if wordtype in ["object", "attr"]:
-        # object, attribute: wordinfo is simply a concept label
+    if wordtype == "object":
+        # object: wordinfo is simply a concept label
 
         word1 = wordinfo
-        
-        neighbors = vec_obj.ranked_sims(word1, wordtype)[1:]
+
+        # compute similarity based on embeddings
+        neighbors = [n for n, _ in vec_obj.ranked_sims(word1, wordtype)[1:] if vgix_obj.isobj(n)]
 
         # sample a 2nd word in simlevel, return its index and the percentile of the index
         word2index, word2rank = sample_cloze_fromlist(neighbors, simlevel, simlevel_vals)
-
-        # what is the actual 2nd word?
-        # neighbors are pairs (word, sim)
-        word2 = neighbors[word2index][0]
+        word2 = neighbors[word2index]
 
         # map word to word ID
-        word1id = vgix_obj.o2ix(word1) if wordtype == "object" else vgix_obj.a2ix(word1)
-        word2id = vgix_obj.o2ix(word2) if wordtype == "object" else vgix_obj.a2ix(word2)
+        word1id = vgix_obj.o2ix(word1) 
+        word2id = vgix_obj.o2ix(word2)
 
-        return (word1, word1id, word2, word2id, word2rank)
+    elif wordtype == "attr":
+        # object: wordinfo is simply a concept label
+
+        word1 = wordinfo
+
+        # compute similarity based on embeddings
+        neighbors = [n for n, _ in vec_obj.ranked_sims(word1, wordtype)[1:] if vgix_obj.isatt(n)]
+
+        # sample a 2nd word in simlevel, return its index and the percentile of the index
+        word2index, word2rank = sample_cloze_fromlist(neighbors, simlevel, simlevel_vals)
+        word2 = neighbors[word2index]
+
+        # map word to word ID
+        word1id = vgix_obj.a2ix(word1) 
+        word2id = vgix_obj.a2ix(word2)
 
     elif wordtype == "rel":
         # relation: wordtype is a list of triples (predarg0/1, predlabel, arglabel)
@@ -207,12 +231,10 @@ def sample_clozepair(wordtype, wordinfo, simlevel,simlevel_vals, vec_obj, vgix_o
         argtype, pred1, arg1 = random.choice(wordinfo)
         word1 = pred1
 
-        neighbors = vec_obj.ranked_sims((pred1, arg1), argtype)[1:]
-
         # filter neighbors: have to have different pred, same arg
-        neighbors = [predarg[0] for predarg, weight in neighbors if predarg[0] != pred1 and predarg[1] == arg1]
+        neighbors = [n[0] for n, _ in vec_obj.ranked_sims((pred1, arg1), argtype)[1:] if vgix_obj.isrel(n[0]) and n[0] != pred1 and n[1] == arg1]
         if len(neighbors) == 0:
-            print("No neighbors for pred/arg pair, skipping:", pred1, arg1, argtype)
+            # print("No neighbors for pred/arg pair, skipping:", pred1, arg1, argtype)
             return None
 
         # sample a 2nd word in simlevel, return its index and the percentile of the index        
@@ -225,10 +247,18 @@ def sample_clozepair(wordtype, wordinfo, simlevel,simlevel_vals, vec_obj, vgix_o
         word1id = vgix_obj.r2ix(word1)
         word2id = vgix_obj.r2ix(word2)
 
-        return (word1, word1id, word2, word2id, word2rank)
-
     else:
         raise Exception( "unknown wordtype " + str(wordtype))
+
+
+    if word1id is None:
+        print("could not determine ID for", word1, wordtype)
+        return None
+    elif word2id is None:
+        print("could not determine ID for", word2, wordtype)
+        return None
+
+    return (word1, word1id, word2, word2id, word2rank)
     
 
 def sample_cloze_fromlist(neighbors, simlevel, simlevel_vals):
@@ -271,6 +301,7 @@ testsentences_transformed = [ ]
 ctype_map = {"object" : "obj", "attr" : "att", "predarg0" : "rel", "predarg1" : "rel", "rel" : "rel"}
 
 for sentid, words, roles in use_testsentences:
+    
     # print("---Sentence:-------")
     # for _, cid, dref in words:
     #     print(vgindex_obj.ix2l(cid)[0] + "(" + str(dref) + ")", end = ", ")
@@ -282,10 +313,10 @@ for sentid, words, roles in use_testsentences:
     ##
     # determine words that could be made into cloze items.
     # for roles, use curried words
-    candidates = candidate_words(words, roles, vgindex_obj, vgobjects_attr_rel, vec_obj, scenario_concept_param)
+    candidates = candidate_words(words, roles, vgindex_obj, vgobjects_attr_rel, vec_obj, scenario_concept_param, arg0counter, arg1counter)
     # print("Candidates")
     # for ctype, cdata, wordix in candidates:
-    #         print(str(wordix) + ":" + str(cdata), end = ", ")
+    #     print(str(wordix) + ":" + str(cdata), end = ", ")
     # print()
 
     ##
@@ -295,13 +326,14 @@ for sentid, words, roles in use_testsentences:
     words_for_cloze = random.sample(candidates, numwords_for_cloze)
     # print("Selected")
     # for ctype, cdata, wordix in words_for_cloze:
-    #         print(str(wordix) + ":" + str(cdata) + "/" + ctype, end = ", ")
+    #     print(str(wordix) + ":" + str(cdata) + "/" + ctype, end = ", ")
     # print()
 
     ##
     # make cloze words, store in gold, store transformed literal
 
     targetwords = [ ]
+    targetword_ids = [ ]
     
     for ctype, cdata, ix in words_for_cloze:
         # find second word as cloze partner for the word in cdata.
@@ -309,6 +341,7 @@ for sentid, words, roles in use_testsentences:
         # of vector neighbors for word1
         retv = sample_clozepair(ctype, cdata, args.simlevel, simlevels, vec_obj, vgindex_obj)
         if retv is None:
+            # print("Unable to sample cloze pair for", cdata, ctype, ix)
             continue
         word1, word1id, word2, word2id, rel_rank_of_word2 = retv
         # print("cloze pair:", vgindex_obj.ix2l(word1id)[0], vgindex_obj.ix2l(word2id)[0], rel_rank_of_word2, next_wordid)
@@ -325,6 +358,8 @@ for sentid, words, roles in use_testsentences:
         # make transformed target word
         w, _, dref = words[ix]
         targetwords.append( [w, next_wordid, dref] )
+        # keep indices of actual targetwords (ones for which we didn't get a None above)
+        targetword_ids.append(ix)
         
         next_wordid += 1
 
@@ -335,7 +370,7 @@ for sentid, words, roles in use_testsentences:
 
     ##
     # what are the non-target words?
-    otherwords = [w for i, w in enumerate(words) if not any(j == i for _, _, j in words_for_cloze)]
+    otherwords = [w for i, w in enumerate(words) if i not in targetword_ids]
 
     # print("targetwords", targetwords)
     # print("other", [(vgindex_obj.ix2l(w)[0], d) for _, w, d in otherwords])

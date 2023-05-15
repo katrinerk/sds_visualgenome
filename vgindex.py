@@ -27,6 +27,15 @@ class VgitemIndex:
     def r2ix(self, r):
         return self.relix.get(r, None)
 
+    def isobj(self, o):
+        return o in self.objectix or (self.additional_dict is not None and (o, "obj") in self.additional_dict)
+
+    def isatt(self, a):
+        return a in self.attrix or (self.additional_dict is not None and (o, "att") in self.additional_dict)
+
+    def isrel(self, r):
+        return r in self.relix or (self.additional_dict is not None and (o, "rel") in self.additional_dict)
+
     def ix2l(self, ix):
         if ix > self.lastix:
             # not an object, attribute, or relation: cloze word?

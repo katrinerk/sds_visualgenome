@@ -22,7 +22,7 @@ from vec_util import VectorInterface
 from sds_imagine_util import  ImagineScen, ImagineAttr
 
 
-from sds import SDS
+from sds_core import SDS
 
 # to fix:
 # - option to include cloze words, don't always look for them

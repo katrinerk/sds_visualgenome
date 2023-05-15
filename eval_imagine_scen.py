@@ -237,8 +237,9 @@ print("Mean average precision:", round(sum([m for m, b in sentid_averageprecisio
       "Baseline mean average precision:", round(sum([b for m, b in sentid_averageprecision.values()]) / len(sentid_averageprecision), 3))
 
 # compute mean perplexity and report it
-print("Average perplexity:", round(sum([m for m, b in sentid_perplexity.values()]) / len(sentid_perplexity), 3),
-      "Baseline average perplexity:", round(sum([b for m, b in sentid_perplexity.values()]) / len(sentid_perplexity), 3))
+# currently buggy, needs to be fixed
+# print("Average perplexity:", round(sum([m for m, b in sentid_perplexity.values()]) / len(sentid_perplexity), 3),
+#       "Baseline average perplexity:", round(sum([b for m, b in sentid_perplexity.values()]) / len(sentid_perplexity), 3))
 
 print("Average rank of highest correct:", sum([m for m, b in sentid_highestcorrect.values()]) / len(sentid_highestcorrect),
       "Baseline average rank of highest correct", sum([b for m, b in sentid_highestcorrect.values()]) / len(sentid_highestcorrect))

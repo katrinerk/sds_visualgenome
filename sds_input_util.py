@@ -465,6 +465,8 @@ class VGSentences:
             print("SDS input util warning: empty sentences found", num_empty, "out of", num_empty + num_nonempty)
 
 
+    ##
+    # write the given sentences to a file
     # set cap to None to no capping
     def write(self, sentences, sentlength_cap = 25):
 
@@ -487,13 +489,27 @@ class VGSentences:
 
             # cut sentence down to maximum length
             if sentlength_cap is not None and len(words) + len(words_to_keep) > sentlength_cap and len(words) > 0:
+                # some cutting to be done
+                # which words are candidates for removal?
+                # all members of words
+                # except where members of words_to_keep are predicates
+                # because then we also need to retain the arguments
+                refs_in_words_to_keep = set(dref for _, _, dref in words_to_keep)
+                argdrefs_of_words_to_keep = set(drefd for _, _, drefh, drefd in roles if drefh in refs_in_words_to_keep)
+
+                # remove the relevant words from words and put them in words_to_keep
+                words_to_keep += [w for w in words if w[2] in argdrefs_of_words_to_keep]
+                words = [w for w in words if w[2] not in argdrefs_of_words_to_keep]
+
+                
                 if len(words_to_keep) >= sentlength_cap:
-                    words, roles = self.remove_from_sent(words, roles, additional_words = words_to_keep, literals = words)
+                    # with just the words to keep, we're already over the cap
+                    # so just keep the words_to_keep and remove all other words
+                    words, roles = self.remove_from_sent(words, roles, keep_these_words = words_to_keep, literals = words)
                     words = words_to_keep + words
                     
                 else:
                     # randomly remove words.
-                    ##
                     # start with words that aren't involved in any
                     # attributes or relations
 
@@ -507,7 +523,7 @@ class VGSentences:
                     non_predarg_literals = [ (w, oid, dref) for w, oid, dref in words if dref not in predarg_drefs ]
                     num_to_remove = min(len(non_predarg_literals), len(words_to_keep) + len(words) - sentlength_cap)
                     literals_to_remove = random.sample(non_predarg_literals, num_to_remove)
-                    words, roles = self.remove_from_sent(words, roles, additional_words = words_to_keep, literals = literals_to_remove)
+                    words, roles = self.remove_from_sent(words, roles, keep_these_words = words_to_keep, literals = literals_to_remove)
                     
                     ##
                     # still too many words? then remove arbitrary words at random,
@@ -520,7 +536,7 @@ class VGSentences:
                         # print("removing", literal_to_remove)
 
                         # do the removal
-                        words, roles = self.remove_from_sent(words, roles, additional_words = words_to_keep, literals = [ literal_to_remove])
+                        words, roles = self.remove_from_sent(words, roles,keep_these_words = words_to_keep, literals = [ literal_to_remove])
                         
                     # print("after shortening", len(words), len(words) + len(words_to_keep))
                     words = words_to_keep + words
@@ -549,7 +565,7 @@ class VGSentences:
         with zipfile.ZipFile(zipfilename, "w", zipfile.ZIP_DEFLATED) as azip:
             azip.writestr(filename, json.dumps(outjson))
 
-    def remove_from_sent(self, words, roles, oids = None, literals = None, additional_words = [ ]):
+    def remove_from_sent(self, words, roles, oids = None, literals = None, keep_these_words = [ ]):
         if oids is None and literals is None:
             raise Exception("SDS input util error: need either object IDs or literals for removal")
 
@@ -560,7 +576,9 @@ class VGSentences:
 
         
         # which referents are mentioned among the literals that we aren't removing?
-        referents_to_keep = set(lit[2] for lit in words + additional_words if lit not in literals_to_remove )
+        # referents in unary literals we're keeping
+        referents_to_keep = set(lit[2] for lit in words + keep_these_words if lit not in literals_to_remove )
+        
         # which referents are only mentioned in removed literals, or are predicates
         # that have an argument we're removing
         referents_to_remove = set(dref for _, _, dref in literals_to_remove if dref not in referents_to_keep)

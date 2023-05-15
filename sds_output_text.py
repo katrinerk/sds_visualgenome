@@ -48,13 +48,14 @@ if args.cloze:
         raise Exception("Was expecting cloze info in gold data", zipfilename)
 
     # dictionary of cloze words
-    cloze_dict = dict( (int(wordid_s), golddata["cloze"]["words"][wordid_s]["word"]) for wordid_s in golddata["cloze"]["words"].keys())
+    cloze_dict = dict( (int(wordid_s), (golddata["cloze"]["words"][wordid_s]["word"], golddata["cloze"]["words"][wordid_s].get("ctype", "obj"))) \
+                            for wordid_s in golddata["cloze"]["words"].keys())
 else:
     cloze_dict = None
 
 
 # mapping between labels and label indices
-vgindex_obj = VgitemIndex(vgobjects_attr_rel, additional_index_obj_dict = cloze_dict)
+vgindex_obj = VgitemIndex(vgobjects_attr_rel, additional_dict = cloze_dict)
 
 # obtain topic characterizations
 topic_obj = sentence_util.TopicInfoUtil(vgpath_obj)
