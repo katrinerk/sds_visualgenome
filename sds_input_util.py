@@ -252,9 +252,9 @@ class VGParam:
 
                 # compute centroid
                 # all words
-                # wordlist = list(cfd[pred].keys())
-                first_n = min([30, len(list(cfd[pred].keys()))])
-                wordlist = [w for w, c in cfd[pred].most_common(first_n)]
+                wordlist = list(cfd[pred].keys())
+                # first_n = min([30, len(list(cfd[pred].keys()))])
+                # wordlist = [w for w, c in cfd[pred].most_common(first_n)]
                 # print("HIER", first_n, len(wordlist))
                 objectlabels_and_sims = self.vec_obj.all_objects_sim_centroid(wordlist)
 
