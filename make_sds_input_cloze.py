@@ -226,7 +226,7 @@ vgsent_obj = VGSentences(vgpath_obj)
 clozeid_sent = defaultdict(list)
 
 
-for sentid, words, roles in vgsent_obj.each_testsentence(vgobj, vgobjects_attr_rel, traintest_split):
+for sentid, words, roles in vgsent_obj.each_sentence(vgobj, vgobjects_attr_rel, traintest_split, "test"):
     # sort words into target words to be replaced by cloze, and others.
     # remove target words that aren't arguments if we are doing that
     target_words = []

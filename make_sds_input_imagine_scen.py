@@ -84,7 +84,7 @@ vgsent_obj = VGSentences(vgpath_obj)
 # store all sentences so we can randomly select among them
 sentences = [ ]
 
-for sentid, words, roles in vgsent_obj.each_testsentence(vgobj, vgobjects_attr_rel, traintest_split):
+for sentid, words, roles in vgsent_obj.each_sentence(vgobj, vgobjects_attr_rel, traintest_split. "test"):
     sentences.append( (sentid, words, roles) )
 
 

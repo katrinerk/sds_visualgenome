@@ -103,7 +103,7 @@ vgsent_obj = VGSentences(vgpath_obj)
 
 # sentences: tuples (sentence ID, word literals, word literals that need to be kept, role literals)
 testsentences = [ ]
-for sentence in vgsent_obj.each_testsentence(vgiter, vgobjects_attr_rel, traintest_split):
+for sentence in vgsent_obj.each_sentence(vgiter, vgobjects_attr_rel, traintest_split, "test"):
     testsentences.append( sentence)
 
 use_testsentences = random.sample(testsentences, args.numsent)

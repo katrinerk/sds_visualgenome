@@ -302,11 +302,23 @@ class VGParam:
             azip.writestr(selpref_file, json.dumps(selpref_json))
 
 ##############################
+###
+# object for writing visual genome sentences to json
+# methods:
+# * iterating through the VG jsons, putting together objects, attributes and relations
+#   and yielding each sentence in our internal pseudo-DRS format 
+# * write sentences to file, optionally downsampling sentence length
+#
+# can write either one sentence at a time, or a list of sentences at a time for SDSD
 class VGSentences:
     def __init__(self, vgpath_obj):
         self.vgpath_obj = vgpath_obj
 
-    def each_testsentence(self, vgobj, vgobjects_attr_rel = None, traintest_split = None):
+
+    # iterate through VG representation,
+    # return each image (from either the train or test split, as given in splitsection)
+    # as a "sentence" 
+    def each_sentence(self, vgobj, vgobjects_attr_rel = None, traintest_split = None, splitsection = "test"):
 
         if vgobjects_attr_rel is None:
             vgcounts_zipfilename, vgcounts_filename = self.vgpath_obj.vg_counts_zip_and_filename()
@@ -320,7 +332,7 @@ class VGSentences:
                 with azip.open(split_filename) as f:
                     traintest_split = json.load(f)
     
-        testset = set(traintest_split["test"])
+        useset = set(traintest_split[splitsection])
         vgindex = VgitemIndex(vgobjects_attr_rel)
 
         ##########
@@ -328,13 +340,13 @@ class VGSentences:
         image_attr = { }
         image_rel = { }
 
-        for img, obj in vgobj.each_image_objects_full(img_ids = testset):
+        for img, obj in vgobj.each_image_objects_full(img_ids = useset):
             image_objects[img] = [ (ell, objid) for objid, names in obj for ell in names]
 
-        for img, attr in vgobj.each_image_attributes_full(img_ids = testset):
+        for img, attr in vgobj.each_image_attributes_full(img_ids = useset):
             image_attr[img] = [ (ell, objid) for names, objid in attr for ell in names]
 
-        for img, rel in vgobj.each_image_relations_full(img_ids = testset):
+        for img, rel in vgobj.each_image_relations_full(img_ids = useset):
             image_rel[img] = rel
 
         # sanity checks
@@ -343,8 +355,8 @@ class VGSentences:
         for img in image_objects:
             this_image_notfound = [ ]
             # all object IDs for this image
-            ids = [id for _, id in image_objects[img]]
-
+            ids = [iid for _, iid in image_objects[img]]
+ 
             for attr, objid in image_attr.get(img, []):
                 if objid not in ids:
                         notfound += 1
@@ -458,7 +470,7 @@ class VGSentences:
             if len(words) == 0:
                 num_empty += 1
             else:
-                yield(img, words, roles)
+                yield (img, words, roles)
                 num_nonempty += 1
 
         if num_empty > 0:
@@ -484,86 +496,107 @@ class VGSentences:
         # ("r", "arg1", relation discourse referent, argument 1 discourse referent)
 
         outjson = []
-        for sentid, words, words_to_keep, roles in sentences:
-            # print("sentlen", len(words) + len(words_to_keep), "keeping:", len(words_to_keep), "shortening:", len(words))
+        for sentence in sentences:
 
-            # cut sentence down to maximum length
-            if sentlength_cap is not None and len(words) + len(words_to_keep) > sentlength_cap and len(words) > 0:
-                # some cutting to be done
-                # which words are candidates for removal?
-                # all members of words
-                # except where members of words_to_keep are predicates
-                # because then we also need to retain the arguments
-                refs_in_words_to_keep = set(dref for _, _, dref in words_to_keep)
-                argdrefs_of_words_to_keep = set(drefd for _, _, drefh, drefd in roles if drefh in refs_in_words_to_keep)
-
-                # remove the relevant words from words and put them in words_to_keep
-                words_to_keep += [w for w in words if w[2] in argdrefs_of_words_to_keep]
-                words = [w for w in words if w[2] not in argdrefs_of_words_to_keep]
-
-                
-                if len(words_to_keep) >= sentlength_cap:
-                    # with just the words to keep, we're already over the cap
-                    # so just keep the words_to_keep and remove all other words
-                    words, roles = self.remove_from_sent(words, roles, keep_these_words = words_to_keep, literals = words)
-                    words = words_to_keep + words
-                    
-                else:
-                    # randomly remove words.
-                    # start with words that aren't involved in any
-                    # attributes or relations
-
-                    # discourse referents that are heads or dependents
-                    # in a role relation
-                    predarg_drefs = set()
-                    for _, _, hdref, adref in roles:
-                        predarg_drefs.add(hdref)
-                        predarg_drefs.add(adref)
-
-                    non_predarg_literals = [ (w, oid, dref) for w, oid, dref in words if dref not in predarg_drefs ]
-                    num_to_remove = min(len(non_predarg_literals), len(words_to_keep) + len(words) - sentlength_cap)
-                    literals_to_remove = random.sample(non_predarg_literals, num_to_remove)
-                    words, roles = self.remove_from_sent(words, roles, keep_these_words = words_to_keep, literals = literals_to_remove)
-                    
-                    ##
-                    # still too many words? then remove arbitrary words at random,
-                    # one by one, because now the removal of one word can trigger
-                    # the removal of syntactically adjacent words
-                    # remove words, one at a time.
-                    while len(words) + len(words_to_keep)  > sentlength_cap and len(words) > 0:
-                        # sample a random literal to remove
-                        literal_to_remove = random.choice(words)
-                        # print("removing", literal_to_remove)
-
-                        # do the removal
-                        words, roles = self.remove_from_sent(words, roles,keep_these_words = words_to_keep, literals = [ literal_to_remove])
-                        
-                    # print("after shortening", len(words), len(words) + len(words_to_keep))
-                    words = words_to_keep + words
-
-            else:
-                words = words_to_keep + words
-
-            # drefs_unary = set(d for _, _, d in words + words_to_keep)
-            # if any(d not in drefs_unary for _, _, _, d in roles) or any(d not in drefs_unary for _, _, d, _ in roles):
-            #     print("discourse referent without unary constraint", sentid)
-            #     # HIER
-            #     for _, _, d1, d2 in roles:
-            #         if d1 not in drefs_unary: print("missing unary for", d1)
-            #         if d2 not in drefs_unary: print("missing unary for", d2)
-            #     print("------words to keep")
-            #     for w in words_to_keep: print(w)
-            #     print("-------other words")
-            #     for w in words: print(w)
-            #     print("---------roles")
-            #     for r in roles: print(r)
-            #     sys.exit(0)
-            
+            sentid, words, roles = self.transform_sentence_downsample(sentence, sentlength_cap)
             outjson.append( { "sentence_id" : sentid, "sentence" : words  + roles } )
         
         zipfilename, filename = self.vgpath_obj.sds_sentence_zipfilename(write = True)
         with zipfile.ZipFile(zipfilename, "w", zipfile.ZIP_DEFLATED) as azip:
             azip.writestr(filename, json.dumps(outjson))
+
+
+    ##
+    # write the given sentence GROUPS to file.
+    # we now have a list of paragraphs, 
+    # where each paragraph is a list of sentences
+    # set cap to None to no capping
+    def write_discourse(self, paragraphs, sentlength_cap = 25):
+
+        outjson = []
+
+        for paragraph in paragraphs:
+            pjson = [ ]
+            for sentence in paragraph:
+
+                sentid, words, roles = self.transform_sentence_downsample(sentence, sentlength_cap)
+                pjson.append( { "sentence_id" : sentid, "sentence" : words  + roles } )
+
+            outjson.append(pjson)
+        
+        zipfilename, filename = self.vgpath_obj.sds_sentence_zipfilename(write = True)
+        with zipfile.ZipFile(zipfilename, "w", zipfile.ZIP_DEFLATED) as azip:
+            azip.writestr(filename, json.dumps(outjson))
+
+
+    ###
+    # possibly downsample a sentence: This method decides which literals to remove,
+    # then it calls remove_from_sent() to do the actual removing.
+    def transform_sentence_downsample(self, sentence, sentlength_cap = 25):
+        sentid, words, words_to_keep, roles = sentence
+
+        # print("sentlen", len(words) + len(words_to_keep), "keeping:", len(words_to_keep), "shortening:", len(words))
+
+        # cut sentence down to maximum length
+        if sentlength_cap is not None and len(words) + len(words_to_keep) > sentlength_cap and len(words) > 0:
+            # some cutting to be done
+            # which words are candidates for removal?
+            # all members of words
+            # except where members of words_to_keep are predicates
+            # because then we also need to retain the arguments
+            refs_in_words_to_keep = set(dref for _, _, dref in words_to_keep)
+            argdrefs_of_words_to_keep = set(drefd for _, _, drefh, drefd in roles if drefh in refs_in_words_to_keep)
+
+            # remove the relevant words from words and put them in words_to_keep
+            words_to_keep += [w for w in words if w[2] in argdrefs_of_words_to_keep]
+            words = [w for w in words if w[2] not in argdrefs_of_words_to_keep]
+
+
+            if len(words_to_keep) >= sentlength_cap:
+                # with just the words to keep, we're already over the cap
+                # so just keep the words_to_keep and remove all other words
+                words, roles = self.remove_from_sent(words, roles, keep_these_words = words_to_keep, literals = words)
+                words = words_to_keep + words
+
+            else:
+                # randomly remove words.
+                # start with words that aren't involved in any
+                # attributes or relations
+
+                # discourse referents that are heads or dependents
+                # in a role relation
+                predarg_drefs = set()
+                for _, _, hdref, adref in roles:
+                    predarg_drefs.add(hdref)
+                    predarg_drefs.add(adref)
+
+                non_predarg_literals = [ (w, oid, dref) for w, oid, dref in words if dref not in predarg_drefs ]
+                num_to_remove = min(len(non_predarg_literals), len(words_to_keep) + len(words) - sentlength_cap)
+                literals_to_remove = random.sample(non_predarg_literals, num_to_remove)
+                words, roles = self.remove_from_sent(words, roles, keep_these_words = words_to_keep, literals = literals_to_remove)
+
+                ##
+                # still too many words? then remove arbitrary words at random,
+                # one by one, because now the removal of one word can trigger
+                # the removal of syntactically adjacent words
+                # remove words, one at a time.
+                while len(words) + len(words_to_keep)  > sentlength_cap and len(words) > 0:
+                    # sample a random literal to remove
+                    literal_to_remove = random.choice(words)
+                    # print("removing", literal_to_remove)
+
+                    # do the removal
+                    words, roles = self.remove_from_sent(words, roles,keep_these_words = words_to_keep, literals = [ literal_to_remove])
+
+                # print("after shortening", len(words), len(words) + len(words_to_keep))
+                words = words_to_keep + words
+
+        else:
+            words = words_to_keep + words
+
+
+        return (sentid, words, roles)
+        
 
     def remove_from_sent(self, words, roles, oids = None, literals = None, keep_these_words = [ ]):
         if oids is None and literals is None:

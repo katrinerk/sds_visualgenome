@@ -88,26 +88,10 @@ class SentencePrinter:
                 dref_wordtype[ dref ] = wordtype
 
 
-            else:
+            elif ell[0] == "r":
                 # binary literal: role
                 _, role, dref_h, dref_d = ell
                 pred_args[dref_h].append( (role, dref_d))
-
-        ###
-        # for words whose type is "xxx", that is, they come from an extra dictionary
-        # of cloze words: determine whether they should be att, rel, obj after all
-        pairs = list(dref_wordtype.items())
-        for dref, wordtype in pairs:
-            if wordtype == "xxx":
-                if dref not in pred_args:
-                    # there are no roles, so call it an object
-                    dref_wordtype[ dref ] = "obj"
-                elif len(pred_args[dref]) == 1:
-                    # one role: call it an attribute
-                    dref_wordtype[ dref ] == "att"
-                else:
-                    # two roles: relation
-                    dref_wordtype[dref] = "rel"
             
         
         ###
