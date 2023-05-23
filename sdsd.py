@@ -37,34 +37,34 @@ if __name__ == '__main__':
     counter = 0
 
     # process each utterance go through utterances in the input file,
-    sentlength_runtime = defaultdict(list)
+    passagelength_runtime = defaultdict(list)
 
+    passages = [ ]
 
-    for sentence_id, sentence in sds_obj.each_sentence_json(verbose = False):
-
-        sentlength = sum(1 for ell in sentence if ell[0] == "w")
-
+    for passage in  sds_obj.each_passage_json(verbose = False):
+        passagelen = len(passage)
+        
         # make a timer to see how long it takes to do
         # graph creation + inference
         tic=timeit.default_timer()
-        
-        with concurrent.futures.ProcessPoolExecutor(max_workers=1) as executor:
-            thismap, thismentalfile = executor.submit(onediscourse_map, [[sentence_id, sentence]], sds_obj).result()
 
+        with concurrent.futures.ProcessPoolExecutor(max_workers=1) as executor:
+            thismap, thismentalfile = executor.submit(onediscourse_map, passage, sds_obj).result()
+
+        # stop timer
+        toc=timeit.default_timer()
+        passagelength_runtime[passagelen].append(toc - tic)
+        
         print(thismap)
         print()
         print(thismentalfile)
 
-        # HIER
-        # if thismap is not None:
-        #     results.append({"sentence_id" : sentence_id, "MAP" : thismap})
+        if thismap is not None:
+            passages.append({"passage" : passage, "MAP" : thismap, "mentalfiles" : thismentalfile})
 
-        # stop timer
-        toc=timeit.default_timer()
-        sentlength_runtime[sentlength].append(toc - tic)
         
         counter += 1
-        if counter % 20 == 0: print(counter)
+        if counter % 10 == 0: print(counter)
 
 
     # write results
@@ -75,6 +75,6 @@ if __name__ == '__main__':
     #     azip.writestr(filename, json.dumps(results))                
 
     # write average runtimes by sentence length
-    for ell in sorted(sentlength_runtime.keys()):
-        print("Sentence length", ell, "#sentences", len(sentlength_runtime[ell]),
-              "mean runtime", round(statistics.mean(sentlength_runtime[ell]), 3))
+    for ell in sorted(passagelength_runtime.keys()):
+        print("Passage length", ell, "#passages", len(passagelength_runtime[ell]),
+              "mean runtime", round(statistics.mean(passagelength_runtime[ell]), 3))

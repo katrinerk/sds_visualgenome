@@ -3,6 +3,10 @@
 # and indices to be used within the factor graph
 
 class VgitemIndex:
+    # initialization with:
+    # dictionary with keys "objects", "attributes", "relations" keeping lists of frequent labels
+    # additional_dict: set to handle cloze words.
+    # this is a dictionary word index -> label, type
     def __init__(self, object_attr_rel_lists, additional_dict = None):
         self.object_attr_rel_lists = object_attr_rel_lists
         self.num_objects = len(object_attr_rel_lists["objects"])
@@ -18,6 +22,8 @@ class VgitemIndex:
         self.additional_dict = additional_dict
 
 
+    ##
+    # map object label or attribute label or relation label to index
     def o2ix(self, o):
         return self.objectix.get(o, None)
 
@@ -27,15 +33,20 @@ class VgitemIndex:
     def r2ix(self, r):
         return self.relix.get(r, None)
 
+    ##
+    # test if a label is an object label, attribute label, or relation label
     def isobj(self, o):
         return o in self.objectix or (self.additional_dict is not None and (o, "obj") in self.additional_dict)
 
     def isatt(self, a):
-        return a in self.attrix or (self.additional_dict is not None and (o, "att") in self.additional_dict)
+        return a in self.attrix or (self.additional_dict is not None and (a, "att") in self.additional_dict)
 
     def isrel(self, r):
-        return r in self.relix or (self.additional_dict is not None and (o, "rel") in self.additional_dict)
+        return r in self.relix or (self.additional_dict is not None and (r, "rel") in self.additional_dict)
 
+    ##
+    # map an index to a pair (label, type)
+    # where type is one of "obj", "att", "rel"
     def ix2l(self, ix):
         if ix > self.lastix:
             # not an object, attribute, or relation: cloze word?

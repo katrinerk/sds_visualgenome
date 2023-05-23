@@ -183,6 +183,7 @@ class ScenarioSampler:
 ################################
 class SDS:
     def __init__(self, vgpath_obj, scenario_config):
+        
         self.scenario_handling = scenario_config["InSDS"]
         if self.scenario_handling not in ["tiled", "unary"]:
             print("Error: scenario handling method must be either 'tiled' or 'unary', I got:", self.scenario_handling)
@@ -207,6 +208,7 @@ class SDS:
                                                      int(scenario_config["NumSamples"]), int(scenario_config["Restarts"]), int(scenario_config["Discard"]))
                                                     
         
+
         
     ########################3
     # read global parameters,
@@ -522,7 +524,7 @@ class SDS:
     def constrain_scenarios(self, fg, scenario_variables, num_nodes, conceptvar_concepts, wordliterals):
 
         # only one scenario? nothing to constrain
-        if self.param_general["num_scenarios"] < 2:
+        if self.param_general["num_scenarios"] < 2 or num_nodes < 2:
             return
 
         if self.scenario_handling == "tiled":

@@ -63,14 +63,14 @@ class SentencePrinter:
         # store the names associated with each discourse referent,
         # and store whether it is an object or not
         # for roles, store the arguments
-        wordliterals = [ ] # list of word literals
+        wordliterals = {"w": [ ], "prew" : []} # list of word literals
         dref_names = defaultdict(list) # keep names for discourse referent
         dref_wordtype = { } # obj or rel or attr
-        pred_args = defaultdict(list) # for predicate dref, keep argument drefs
+        pred_args = {"r": defaultdict(list), "prer" : defaultdict(list)} # for predicate dref, keep argument drefs
         target_dref = None
 
         for ell in sentence:
-            if ell[0] == "w":
+            if ell[0].endswith("w"): # w, prew
                 # unary literal, word for either an object or an attribute or a relation
                 _, word_id, dref = ell
 
@@ -81,19 +81,32 @@ class SentencePrinter:
 
 
                 # store word literals, in order: word label, discourse referent
-                wordliterals.append( ( word, dref) )
+                # append to either presupposed, or non-presupposed
+                wordliterals[ell[0]].append( ( word, dref) )
                 # store label for this discourse referent
                 dref_names[ dref].append(word)
                 # store word type for this discourse referent
                 dref_wordtype[ dref ] = wordtype
 
 
-            elif ell[0] == "r":
+            elif ell[0].endswith("r"):
                 # binary literal: role
                 _, role, dref_h, dref_d = ell
-                pred_args[dref_h].append( (role, dref_d))
+                pred_args[ell[0]][dref_h].append( (role, dref_d))
             
+
+        ###
+        # any presupposed material to write?
+        if len(wordliterals["prew"]) > 0 or len(pred_args["prer"]) > 0:
+            print("--Presupposed--", file = self.outf)
+            self.write_aux(wordliterals["prew"], dref_names, dref_wordtype, pred_args["prer"], target_dref, targetindex, scenario_concept_assignment)
+            print("----")
+
+        if len(wordliterals['w']) > 0 or len(pred_args['r']) > 0:
+            self.write_aux(wordliterals['w'], dref_names, dref_wordtype, pred_args['r'], target_dref, targetindex, scenario_concept_assignment)
         
+
+    def write_aux(self, wordliterals, dref_names, dref_wordtype, pred_args, target_dref, targetindex, scenario_concept_assignment):
         ###
         # now write word literals for objects, attributes, relations
         for wtype, wtype_txt in [("obj", "Objects"), ("att", "Attributes"), ("rel", "Relations")]:
