@@ -25,9 +25,10 @@ from vgpaths import VGPaths
 parser = ArgumentParser()
 parser.add_argument('--output', help="directory to write output to, default: sds_in/imagine_scen", default = "sds_in/imagine_scen/")
 parser.add_argument('--vgdata', help="directory with VG data including frequent items, train/test split, topic model", default = "data/")
-parser.add_argument('--numsent', help="number of sentences to sample for evaluation, default 1000", type = int, default = 100)
+parser.add_argument('--numsent', help="number of sentences to sample for evaluation, default 1000", type = int, default = 1000)
 parser.add_argument('--maxobj', help="maximum number of objects per sentence to retain, default 25", type = int, default = 25)
 parser.add_argument('--testfrac', help="for short sentences, fraction of objects to use for testing, default 0.3", type = float, default = 0.3)
+parser.add_argument('--test', help = "evaluate on test sentences rather than dev. Default: false.", action = "store_true")
 
 args = parser.parse_args()
 print("Reading VG data from", args.vgdata, "and writing output to", args.output)
@@ -84,7 +85,12 @@ vgsent_obj = VGSentences(vgpath_obj)
 # store all sentences so we can randomly select among them
 sentences = [ ]
 
-for sentid, words, roles in vgsent_obj.each_sentence(vgobj, vgobjects_attr_rel, traintest_split. "test"):
+if args.test:
+    section = "test"
+else:
+    section = "dev"
+
+for sentid, words, roles in vgsent_obj.each_sentence(vgobj, vgobjects_attr_rel, traintest_split, section):
     sentences.append( (sentid, words, roles) )
 
 

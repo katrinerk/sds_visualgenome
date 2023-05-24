@@ -49,7 +49,7 @@ num_devtest_datapoints = int(num_datapoints * devtestpercentage)
 random.seed(random_seed)
 devtest_images = random.sample(vgitems["images"], num_devtest_datapoints)
 
-test_images = random.sample(devgtest_images, int(num_devtest_datapoints / 2))
+test_images = random.sample(devtest_images, int(num_devtest_datapoints / 2))
 testset = set(test_images)
 
 dev_images = [i for i in devtest_images if i not in testset]
@@ -113,16 +113,21 @@ for img, frequent_rel in vgobj.each_image_relations():
         elif img in devset: dev_rel[label] += 1
 
 print("--")
-print("Number of object instances: Training:", train_objects.total())
-print("Number of object instances: Dev:", dev_objects.total())
-print("Number of object instances: Test:", test_objects.total())
+print("Number of images: Training:", len(trainset))
+print("Number of images: Dev:", len(devset))
+print("Number of images: Test:", len(testset))
 
 print("--")
-print("Number of attribute instances: Training:", train_attrib.total())
-print("Number of attribute instances: Dev:", dev_attrib.total())
-print("Number of attribute instances: Test", test_attrib.total())
+print("Number of object instances: Training:", sum(train_objects.values()))
+print("Number of object instances: Dev:", sum(dev_objects.values()))
+print("Number of object instances: Test:", sum(test_objects.values()))
 
 print("--")
-print("Number of relation instances: Training:", train_rel.total())
-print("Number of relation instances: Dev:", dev_rel.total())
-print("Number of relation instances: Test", test_rel.total())
+print("Number of attribute instances: Training:", sum(train_attrib.values()))
+print("Number of attribute instances: Dev:", sum(dev_attrib.values()))
+print("Number of attribute instances: Test", sum(test_attrib.values()))
+
+print("--")
+print("Number of relation instances: Training:", sum(train_rel.values()))
+print("Number of relation instances: Dev:", sum(dev_rel.values()))
+print("Number of relation instances: Test", sum(test_rel.values()))
