@@ -29,7 +29,7 @@ vgpath_obj = VGPaths(vgdata = args.vgdata)
 config = configparser.ConfigParser()
 config.read("settings.txt")
 
-testpercentage = float(config["Parameters"]["Testpercentage"])
+devtestpercentage = float(config["Parameters"]["Testpercentage"])
 
 random_seed = 78923456
 
@@ -44,17 +44,25 @@ with zipfile.ZipFile(vgcounts_zipfilename) as azip:
 ##
 # make random split
 num_datapoints = len(vgitems["images"])
-num_test_datapoints = int(num_datapoints * testpercentage)
+num_devtest_datapoints = int(num_datapoints * devtestpercentage)
 
 random.seed(random_seed)
-test_images = random.sample(vgitems["images"], num_test_datapoints)
+devtest_images = random.sample(vgitems["images"], num_devtest_datapoints)
+
+test_images = random.sample(devgtest_images, int(num_devtest_datapoints / 2))
+testset = set(test_images)
+
+dev_images = [i for i in devtest_images if i not in testset]
+
+devset = set(dev_images)
+devtestset= set(devtest_images)
 
 ##
 # write output
-testset = set(test_images)
 
 out = { "test" : sorted(test_images),
-        "train" : sorted([i for i in vgitems["images"] if i not in testset]) }
+        "dev" : sorted(dev_images),
+        "train" : sorted([i for i in vgitems["images"] if i not in devtestset]) }
 
 split_zipfilename, split_filename = vgpath_obj.vg_traintest_zip_and_filename(write = True)
 with zipfile.ZipFile(split_zipfilename, "w", zipfile.ZIP_DEFLATED) as azip:
@@ -71,10 +79,15 @@ freq_relations = set(vgitems["relations"])
 
 train_objects= Counter()
 test_objects = Counter()
+dev_objects = Counter()
+
 train_attrib = Counter()
 test_attrib = Counter()
+dev_attrib = Counter()
+
 train_rel = Counter()
 test_rel = Counter()
+dev_rel = Counter()
 
 vgobj = vgiterator.VGIterator(vgcounts = vgitems)
 
@@ -83,31 +96,33 @@ for img, frequent_objects in vgobj.each_image_objects():
     for label in frequent_objects:
         if img in trainset: train_objects[label] += 1
         elif img in testset: test_objects[label] += 1
+        elif img in devset: dev_objects[label] += 1
 
 # attribute counts
 for img, frequent_attrib in vgobj.each_image_attributes():
     for label in frequent_attrib:
         if img in trainset: train_attrib[label] += 1
         elif img in testset: test_attrib[label] += 1
+        elif img in devset: dev_attrib[label] += 1
 
 # relation counts
 for img, frequent_rel in vgobj.each_image_relations():
     for label in frequent_rel:
         if img in trainset: train_rel[label] += 1
         elif img in testset: test_rel[label] += 1
+        elif img in devset: dev_rel[label] += 1
 
 print("--")
 print("Number of object instances: Training:", train_objects.total())
-#print(text_histogram.histogram(list(train_objects.values())))
+print("Number of object instances: Dev:", dev_objects.total())
 print("Number of object instances: Test:", test_objects.total())
-#print(text_histogram.histogram(list(test_objects.values())))
+
 print("--")
 print("Number of attribute instances: Training:", train_attrib.total())
-#print(text_histogram.histogram(list(train_attrib.values())))
+print("Number of attribute instances: Dev:", dev_attrib.total())
 print("Number of attribute instances: Test", test_attrib.total())
-#print(text_histogram.histogram(list(test_attrib.values())))
+
 print("--")
 print("Number of relation instances: Training:", train_rel.total())
-#print(text_histogram.histogram(list(train_rel.values())))
+print("Number of relation instances: Dev:", dev_rel.total())
 print("Number of relation instances: Test", test_rel.total())
-#print(text_histogram.histogram(list(test_rel.values())))

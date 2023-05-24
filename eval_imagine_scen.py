@@ -9,6 +9,7 @@ import json
 import zipfile
 from collections import defaultdict, Counter
 import math
+import statistics
 import numpy as np
 import random
 from argparse import ArgumentParser
@@ -132,9 +133,12 @@ def highestcorrect(predicted, gold):
 
 # perplexity for a series of observations.
 # but keep conditional probability conditioned
-# only on the seen document not the other unseen observations
+# only on the seen document not the other unseen observations,
+# compute perplexity separately for each item
 def perplexity(objects, predicted_logprob, new_objects):
-    return math.exp(- (1 / len(new_objects)) * sum([ logprob for o, logprob in zip(objects, predicted_logprob) if o in new_objects]))
+    return [ math.exp(-logprob) for o, logprob in zip(objects, predicted_logprob) if o in new_objects]
+
+    # return math.exp(- (1 / len(new_objects)) * sum([ logprob for o, logprob in zip(objects, predicted_logprob) if o in new_objects]))
     
         
 #############
@@ -176,6 +180,8 @@ print("Evaluating")
 sentid_averageprecision = { }
 sentid_highestcorrect = { }
 sentid_perplexity = { }
+all_perplexity = [ ]
+all_base_perplexity = [ ]
 
 # which sentences to sample for inspection?
 sentence_ids_to_inspect = random.sample(list(sentid_sent.keys()), args.num_inspect)
@@ -190,13 +196,6 @@ with open(outpath, "w") as outf:
 
         model_objectid_ranking, model_objectid_logprob = scen_obj.predict_objectids(scenarios_this_sent)
 
-        # print("gold hidden objects", [vgindex_obj.ix2l(o)[0] for o in gold_hidden_objectids])
-        # print("scenarios", sorted(scenarios_this_sent))
-        # for sc, _ in Counter(scenarios_this_sent).most_common(3):
-        #    print(topic_obj.topic_info(sc))
-
-        # print("model assign", [vgindex_obj.ix2l(o)[0] for o in model_objectid_ranking[:5]])
-        
         
         sentid_averageprecision[ sentence_id ] = ( averageprecision(model_objectid_ranking, gold_hidden_objectids),
                                                    averageprecision(baseline_objectid_ranking, gold_hidden_objectids) )
@@ -204,8 +203,11 @@ with open(outpath, "w") as outf:
         sentid_highestcorrect[ sentence_id] = (highestcorrect(model_objectid_ranking, gold_hidden_objectids),
                                                highestcorrect(baseline_objectid_ranking, gold_hidden_objectids) )
 
-        sentid_perplexity[ sentence_id ] = ( perplexity(model_objectid_ranking, model_objectid_logprob, gold_hidden_objectids),
-                                             perplexity(baseline_objectid_ranking, baseline_objectid_logprob, gold_hidden_objectids) )
+        mplex = perplexity(model_objectid_ranking, model_objectid_logprob, gold_hidden_objectids)
+        bplex = perplexity(baseline_objectid_ranking, baseline_objectid_logprob, gold_hidden_objectids)
+        sentid_perplexity[ sentence_id ] = ( statistics.median(mplex), statistics.median(bplex))
+        all_perplexity += mplex
+        all_base_perplexity += bplex
                 
 
         if sentence_id in sentence_ids_to_inspect:
@@ -229,20 +231,29 @@ with open(outpath, "w") as outf:
                 print(sc, topic_obj.topic_info(sc), file = outf)
             
             print("\n\nAverage precision:", sentid_averageprecision[sentence_id][0], file = outf)
-            print("Perplexity:", sentid_perplexity[sentence_id][0], file = outf)
+            print("Median perplexity:", sentid_perplexity[sentence_id][0], file = outf)
             print(file = outf)
 
 # compute mean average precision and report it
 print("Mean average precision:", round(sum([m for m, b in sentid_averageprecision.values()]) / len(sentid_averageprecision), 3),
       "Baseline mean average precision:", round(sum([b for m, b in sentid_averageprecision.values()]) / len(sentid_averageprecision), 3))
 
-# compute mean perplexity and report it
-# currently buggy, needs to be fixed
-# print("Average perplexity:", round(sum([m for m, b in sentid_perplexity.values()]) / len(sentid_perplexity), 3),
-#       "Baseline average perplexity:", round(sum([b for m, b in sentid_perplexity.values()]) / len(sentid_perplexity), 3))
-
 print("Average rank of highest correct:", sum([m for m, b in sentid_highestcorrect.values()]) / len(sentid_highestcorrect),
       "Baseline average rank of highest correct", sum([b for m, b in sentid_highestcorrect.values()]) / len(sentid_highestcorrect))
+
+# compute mean perplexity and report it
+# mean perplexity is not particularly useful, as perplexities under the model
+# are much more wide spread than under the baseline.
+# some words are much more likely, but some are tremendously more unlikely
+# and that drives the mean
+print("Average perplexity:", round(sum(all_perplexity) / len(all_perplexity), 3), 
+      "Baseline average perplexity:", round(sum(all_base_perplexity) / len(all_base_perplexity), 3))
+
+print("Median perplexity:", round(statistics.median(all_perplexity), 3), 
+      "Baseline median perplexity:", round(statistics.median(all_base_perplexity), 3))
+
+# print("perplexity histogram", np.histogram(np.array(all_perplexity), bins = [0,4,8,12, 100, 500, 1000000]))
+# print("base perplexity histogram", np.histogram(np.array(all_base_perplexity), bins = [0,4,8,12, 100, 500, 1000000]))
 
 print()
 
