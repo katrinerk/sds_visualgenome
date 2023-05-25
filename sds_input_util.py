@@ -29,7 +29,7 @@ class VGParam:
     # frequentobj: counts of frequent objects, attributes, relations, will be read from file if not given
     # selpref_vectors: if True, compute selectional preferences using vectors rather than observed
     #   relative frequencies
-    def __init__(self, vgpath_obj, frequentobj = None, selpref_vectors = True):
+    def __init__(self, vgpath_obj, selpref_method, frequentobj = None):
         # object with paths to VG data
         self.vgpath_obj = vgpath_obj
 
@@ -54,8 +54,8 @@ class VGParam:
         self.testset = set(traintest_split["test"])
 
         # read vectors?
-        self.selpref_vectors = selpref_vectors
-        self.vec_obj = VectorInterface(self.vgpath_obj) if self.selpref_vectors else None
+        self.selpref_method = selpref_method
+        self.vec_obj = VectorInterface(self.vgpath_obj) if self.selpref_method["Method"] == "centroid" else None
 
     # obtain data and return it:
     # * global parameters
@@ -193,10 +193,12 @@ class VGParam:
                 for l in img_objid_label[imgid][objid]:
                     rel_count_obj[predname][l] += 1
 
-        if self.selpref_vectors:
+        if self.selpref_method["Method"] == "centroid":
             selpref_json = self.compute_selpref_vectors(attr_count, rel_count_subj, rel_count_obj)
-        else:
+        elif self.selpref_method["Method"] == "relfreq":
             selpref_json = self.compute_selpref_relfreq(attr_count, rel_count_subj, rel_count_obj)
+        else:
+            raise Exception("Unknown selectional preference method " + str(self.selpref_method["Method"]))
 
         retv.append(selpref_json)
 
@@ -251,11 +253,15 @@ class VGParam:
                         print("no index found for rel", pred)
 
                 # compute centroid
-                # all words
-                wordlist = list(cfd[pred].keys())
-                # first_n = min([30, len(list(cfd[pred].keys()))])
-                # wordlist = [w for w, c in cfd[pred].most_common(first_n)]
-                # print("HIER", first_n, len(wordlist))
+                if self.selpref_method["CentroidParam"] == "all":
+                    # all words
+                    wordlist = list(cfd[pred].keys())
+                elif self.selpref_method["CentroidParam"] == "top":
+                    first_n = min([30, len(list(cfd[pred].keys()))])
+                    wordlist = [w for w, c in cfd[pred].most_common(first_n)]
+                else:
+                    raise Exception("settings.txt: need CentroidParam to be all or top")
+                    
                 objectlabels_and_sims = self.vec_obj.all_objects_sim_centroid(wordlist)
 
                 # centroid was zero, nothing to be done for this predicate
@@ -265,7 +271,7 @@ class VGParam:
                 for arg, sim in objectlabels_and_sims:
                     if sim > 0:
                         selpref_json[label]["config"].append( (predix, self.vgindex.o2ix(arg)))
-                        selpref_json[label]["weight"].append( sim)
+                        selpref_json[label]["weight"].append( math.log(sim))
                 
         return selpref_json
                     

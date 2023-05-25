@@ -9,6 +9,7 @@ import json
 import zipfile
 from collections import defaultdict, Counter
 import math
+import statistics
 import numpy as np
 import random
 from argparse import ArgumentParser
@@ -32,11 +33,19 @@ parser = ArgumentParser()
 parser.add_argument('--outdir', help="directory to write output for inspection, default: inspect_output/imagine_att", default = "inspect_output/imagine_att/")
 parser.add_argument('--vgdata', help="directory with VG data including frequent items, train/test split, topic model", default = "data/")
 parser.add_argument('--trainperc', help = "percentage of object types to use for training PLSR, default 0.8", type = float, default = 0.8)
-parser.add_argument('--num_att', help = "number of top attributes to use, default 500", type = int, default = 500)
+parser.add_argument('--num_att', help = "number of top attributes to use, default 1000", type = int, default = 1000)
 parser.add_argument('--plsr_components', help = "number of components to use for PLSR, default 100", type = int, default = 100)
 parser.add_argument('--num_inspect', help = "number of objects to write for inspection, default 20", type = int, default = 20)
+parser.add_argument('--test', help = "evaluate on test sentences rather than dev. Default: false.", action = "store_true")
+
 
 args = parser.parse_args()
+
+
+if args.test:
+    testsection = "test"
+else:
+    testsection = "dev"
 
 
 random.seed(6543)
@@ -77,7 +86,7 @@ with zipfile.ZipFile(split_zipfilename) as azip:
         traintest_split = json.load(f)
     
 trainset = set(traintest_split["train"])
-testset = set(traintest_split["test"])
+testset = set(traintest_split[testsection])
 
 vgiter = vgiterator.VGIterator(vgobjects_attr_rel)
 
@@ -97,24 +106,25 @@ Ypredict_test, Ygoldtest, test_used_object_labels = attr_obj.predict_forobj(test
 ##
 # write output for inspection:
 # several objects from the test portion, with gold and predicted features
-outpath = get_output_path(os.path.join(args.outdir, "eval_imagine_att_out.txt"))
-inspect_objectindices = random.sample(list(range(len(test_used_object_labels))), args.num_inspect)
-with open(outpath, "w") as outf:
-    for objix in inspect_objectindices:
-        objlabel = test_used_object_labels[objix]
-        
-        print("-----------\nObject:", objlabel, "\n", file = outf)
-        
-        print("Gold (top 20):", file = outf)
-        for a, p in sorted(zip(attr_obj.attributelabels, attr_obj.obj_att_prob[objlabel]), key = lambda p:p[1], reverse = True)[:20]:
-            if p > 0.0:
+if args.num_inspect  > 0:
+    outpath = get_output_path(os.path.join(args.outdir, "eval_imagine_att_out.txt"))
+    inspect_objectindices = random.sample(list(range(len(test_used_object_labels))), args.num_inspect)
+    with open(outpath, "w") as outf:
+        for objix in inspect_objectindices:
+            objlabel = test_used_object_labels[objix]
+
+            print("-----------\nObject:", objlabel, "\n", file = outf)
+
+            print("Gold (top 20):", file = outf)
+            for a, p in sorted(zip(attr_obj.attributelabels, attr_obj.obj_att_prob[objlabel]), key = lambda p:p[1], reverse = True)[:20]:
+                if p > 0.0:
+                    print("\t", a, ":", p, file = outf)
+            print(file = outf)
+
+            print("Predicted (top 20):", file = outf)
+            att_pred = zip(attr_obj.attributelabels, Ypredict_test[objix])
+            for a, p in sorted(att_pred, key = lambda p:p[1], reverse = True)[:20]:
                 print("\t", a, ":", p, file = outf)
-        print(file = outf)
-        
-        print("Predicted (top 20):", file = outf)
-        att_pred = zip(attr_obj.attributelabels, Ypredict_test[objix])
-        for a, p in sorted(att_pred, key = lambda p:p[1], reverse = True)[:20]:
-            print("\t", a, ":", p, file = outf)
 
 #########3
 print("Evaluating")
@@ -128,7 +138,10 @@ def average_spearman(model_lists, gold_lists, single_list = False):
         rhos = [ stats.spearmanr(model_lists, gl).statistic for gl in gold_lists]
     else:
         rhos = [ stats.spearmanr(mi, gi).statistic for mi, gi in zip(model_lists, gold_lists)]
-        
+
+    rhos = [r for r in rhos if not math.isnan(r)]
+    # print("len rhos", len(rhos), "mean", sum(rhos)/len(rhos), "median", statistics.median(rhos))
+    
     if len(rhos) > 0:
         return sum(rhos) / len(rhos)
     else:
@@ -146,6 +159,20 @@ print("Average Spearman's rho, frequency baseline: Training objects:",
       round(average_spearman(baseline_weights, Ygoldtrain, single_list = True), 3),
       "Test objects:", 
       round(average_spearman(baseline_weights, Ygoldtest, single_list = True), 3))
+
+# spearman by frequency bin
+num_att = len(list(attr_obj.att_count.keys()))
+vbin1 = int(num_att/2)
+att_sorted = [a for a, _ in attr_obj.att_count.most_common()]
+bin0 = att_sorted[:vbin1]
+bin1 = att_sorted[vbin1:]
+
+
+for binname, thisbin in [ ("more frequent", bin0), ("less frequent", bin1)]:
+    binpredict = [ [val for a, val in zip(att_sorted, ml) if a in thisbin] for ml in Ypredict_test]
+    bingold = [ [val for a, val in zip(att_sorted, ml) if a in thisbin] for ml in Ygoldtest]
+    print("Average Spearman's rho (on test data), for", binname, "attributes:", round(average_spearman(binpredict, bingold), 3))
+
 ##
 # second evaluation:
 # for individual sentences from the test data,

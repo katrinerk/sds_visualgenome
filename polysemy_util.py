@@ -127,6 +127,22 @@ class SyntheticPolysemes:
 
         return (sentences_transformed, gold)
 
+    ##
+    # making a cloze pair for one object
+    def make_obj_cloze(self, conceptid, simlevel):
+        conceptlabel, _ = self.vgix_obj.ix2l(conceptid)
+        # can we make a cloze partner for this word?
+        if conceptlabel not in self.vgfrequent_words["objects"] or conceptlabel not in self.vec_obj.object_vec.keys() or conceptid not in self.concept_scenario_mapping:
+            return None
+
+        retv = self._sample_clozepair("object", conceptlabel, simlevel)
+        if retv is None:
+            return None
+
+        word1, word1id, word2, word2id, rel_rank_of_word2 = retv
+
+        return (word1, word1id, word2, word2id)
+            
 
     ##
     # make list of candidates for cloze.

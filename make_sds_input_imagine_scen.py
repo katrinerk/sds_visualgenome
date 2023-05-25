@@ -13,6 +13,8 @@ from collections import defaultdict, Counter
 import numpy as np
 import random
 from argparse import ArgumentParser
+import configparser
+
 
 import vgiterator
 from sds_input_util import VGSentences, VGParam
@@ -32,6 +34,12 @@ parser.add_argument('--test', help = "evaluate on test sentences rather than dev
 
 args = parser.parse_args()
 print("Reading VG data from", args.vgdata, "and writing output to", args.output)
+
+
+# settings file
+config = configparser.ConfigParser()
+config.read("settings.txt")
+selpref_method = config["Selpref"]
 
 
 vgpath_obj = VGPaths(vgdata = args.vgdata, sdsdata = args.output)
@@ -65,7 +73,7 @@ random.seed(6543)
 
 print("writing SDS parameters")
     
-vgparam_obj = VGParam(vgpath_obj)
+vgparam_obj = VGParam(vgpath_obj, selpref_method)
 global_param, scenario_concept_param, word_concept_param, selpref_param = vgparam_obj.get()
 vgparam_obj.write(global_param, scenario_concept_param, word_concept_param, selpref_param)
 

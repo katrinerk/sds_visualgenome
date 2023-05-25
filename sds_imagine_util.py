@@ -5,6 +5,7 @@
 # evaluation scripts and interactive SDS
 
 import os
+import sys
 import json
 import zipfile
 import math
@@ -66,10 +67,15 @@ class ImagineScen:
     def predict_objectids(self, scenario_list):
         # obtain scenario probabilities within the scenario list
         sc_freq = Counter(scenario_list)
+        # last scenario is a dummy, it has no entry in scenario_probs
+        dummyscenario = len(self.scenario_probs)
+        del sc_freq[dummyscenario]
+        
         # sc_prob: dictionary scenario ID -> probability of this scenario in this sentence
         normalizer = sum(sc_freq.values())
-        sc_prob = dict( (s, sc_freq[s] / normalizer) for s in sc_freq.keys() )
+        sc_prob = dict( (s, sc_freq[s] / normalizer) for s in sc_freq.keys())
 
+        
         # scenario_probs: list where the i-th entry is for the i-th scenario,
         #    each entry is a numpy array of object probabilities
         # compute: sum_{s scenario in this sentence} this_sentence_scenario_prob(s) * prob_of_each_object(s)

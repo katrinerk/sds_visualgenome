@@ -15,6 +15,8 @@ import math
 import numpy as np
 from argparse import ArgumentParser
 import random
+import configparser
+
 
 import vgiterator
 from sds_input_util import VGSentences, VGParam
@@ -30,12 +32,17 @@ from vgpaths import VGPaths
 parser = ArgumentParser()
 parser.add_argument('--output', help="directory to write output to, default: sds_in/vanilla", default = "sds_in/vanilla/")
 parser.add_argument('--vgdata', help="directory with VG data including frequent items, train/test split, topic model", default = "data/")
-parser.add_argument('--selpref_relfreq', help="selectional preferences using relative frequency rather than similarity to centroid?  default: False", action = "store_true")
 parser.add_argument('--numsent', help="number of test sentences to sample, default 100", type = int, default = 100)
 
 args = parser.parse_args()
 
-print("Using embeddings to compute selectional constraints?", not(args.selpref_relfreq))
+
+# settings file
+config = configparser.ConfigParser()
+config.read("settings.txt")
+selpref_method = config["Selpref"]
+
+print("Selectional constraints method", selpref_method["Method"])
 
 vgpath_obj = VGPaths(vgdata = args.vgdata,  sdsdata = args.output)
 
@@ -61,8 +68,7 @@ vgobj = vgiterator.VGIterator(vgcounts = vgobjects_attr_rel)
 
 ####
 # write parameters for SDS.
-vgparam_obj = VGParam(vgpath_obj, frequentobj = vgobjects_attr_rel,
-                      selpref_vectors = not(args.selpref_relfreq))
+vgparam_obj = VGParam(vgpath_obj, selpref_method, frequentobj = vgobjects_attr_rel)
 
 print("computing parameters")
 

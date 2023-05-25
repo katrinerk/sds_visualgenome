@@ -15,6 +15,7 @@ import math
 import numpy as np
 import random
 from argparse import ArgumentParser
+import configparser
 
 import vgiterator
 from sds_input_util import VGSentences, VGParam
@@ -31,7 +32,6 @@ parser = ArgumentParser()
 parser.add_argument('--output', help="directory to write output to, default: sds_in/veccloze", default = "sds_in/veccloze/")
 parser.add_argument('--vgdata', help="directory with VG data including frequent items, train/test split, topic model", default = "data/")
 parser.add_argument('--numsent', help="Number of sentences to use, default 2000", type = int, default = 2000)
-parser.add_argument('--selpref_relfreq', help="selectional preferences using relative frequency rather than similarity to centroid?  default: False", action = "store_true")
 parser.add_argument('--maxlen', help="maximum sentence length, default = 25", type = int, default = 25)
 parser.add_argument('--simlevel', help="choose cloze pairs only in this similarity range: 0-3, 0 is most similar, default: no restriction", type =int, default = -1)
 parser.add_argument('--singleword', help="only one ambiguous word per sentence. default:False", action= "store_true")
@@ -41,6 +41,12 @@ args = parser.parse_args()
 if args.simlevel not in [-1, 0, 1,2,3]:
     print("Similarity level must be in 0-3, or don't set")
     sys.exit(0)
+
+
+# settings file
+config = configparser.ConfigParser()
+config.read("settings.txt")
+selpref_method = config["Selpref"]
 
 ##########################
 # read data
@@ -67,8 +73,7 @@ random.seed(543)
 
 vgindex_obj = VgitemIndex(vgobjects_attr_rel)
 
-vgparam_obj = VGParam(vgpath_obj, selpref_vectors = not(args.selpref_relfreq),
-                      frequentobj = vgobjects_attr_rel)
+vgparam_obj = VGParam(vgpath_obj, selpref_method, frequentobj = vgobjects_attr_rel)
 
 global_param, scenario_concept_param, word_concept_param, selpref_param = vgparam_obj.get()
 

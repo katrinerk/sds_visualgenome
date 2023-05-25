@@ -35,17 +35,15 @@ from sentence_util import SentencePrinter
 parser = ArgumentParser()
 parser.add_argument('--sdsdata', help="directory for SDS parameters, default: sds_in/discourse", default = "sds_in/discourse/")
 parser.add_argument('--vgdata', help="directory with VG data including frequent items, train/test split, topic model", default = "data/")
-parser.add_argument('--selpref_relfreq', help="selectional preferences using relative frequency rather than similarity to centroid?  default: False", action = "store_true")
 
 args = parser.parse_args()
-
-print("Using embeddings to compute selectional constraints?", not(args.selpref_relfreq))
 
 vgpath_obj = VGPaths(vgdata = args.vgdata, sdsdata = args.sdsdata)
 
 # settings file
 config = configparser.ConfigParser()
 config.read("settings.txt")
+selpref_method = config["Selpref"]
 
 print("reading data")
 
@@ -62,8 +60,7 @@ out_obj = SentencePrinter(vgindex_obj)
 ####
 # compute parameters for SDS.
 print("computing parameters")
-vgparam_obj = VGParam(vgpath_obj, frequentobj = vgobjects_attr_rel,
-                      selpref_vectors = not(args.selpref_relfreq))
+vgparam_obj = VGParam(vgpath_obj, selpref_method, frequentobj = vgobjects_attr_rel)
 
 
 global_param, scenario_concept_param, word_concept_param, selpref_param = vgparam_obj.get()

@@ -184,7 +184,7 @@ all_perplexity = [ ]
 all_base_perplexity = [ ]
 
 # which sentences to sample for inspection?
-sentence_ids_to_inspect = random.sample(list(sentid_sent.keys()), args.num_inspect)
+sentence_ids_to_inspect = random.sample(list(sentid_sent.keys()), args.num_inspect) if args.num_inspect > 0 else [ ]
 
 # loop over files, evaluate, write inspection files
 outpath = get_output_path(os.path.join(args.outdir, "eval_imagine_scen_out.txt"))
@@ -238,8 +238,8 @@ with open(outpath, "w") as outf:
 print("Mean average precision:", round(sum([m for m, b in sentid_averageprecision.values()]) / len(sentid_averageprecision), 3),
       "Baseline mean average precision:", round(sum([b for m, b in sentid_averageprecision.values()]) / len(sentid_averageprecision), 3))
 
-print("Average rank of highest correct:", sum([m for m, b in sentid_highestcorrect.values()]) / len(sentid_highestcorrect),
-      "Baseline average rank of highest correct", sum([b for m, b in sentid_highestcorrect.values()]) / len(sentid_highestcorrect))
+print("Average rank of highest correct:", round(sum([m for m, b in sentid_highestcorrect.values()]) / len(sentid_highestcorrect), 3),
+      "Baseline average rank of highest correct", round(sum([b for m, b in sentid_highestcorrect.values()]) / len(sentid_highestcorrect), 3))
 
 # compute mean perplexity and report it
 # mean perplexity is not particularly useful, as perplexities under the model

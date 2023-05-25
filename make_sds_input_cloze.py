@@ -14,6 +14,8 @@ import math
 import numpy as np
 import random
 from argparse import ArgumentParser
+import configparser
+
 
 import vgiterator
 from sds_input_util import VGSentences, VGParam
@@ -26,16 +28,18 @@ from vgpaths import VGPaths
 parser = ArgumentParser()
 parser.add_argument('--output', help="directory to write output to, default: sds_in/cloze", default = "sds_in/cloze/")
 parser.add_argument('--vgdata', help="directory with VG data including frequent items, train/test split, topic model", default = "data/")
-parser.add_argument('--selpref_relfreq', help="selectional preferences using relative frequency rather than similarity to centroid?  default: False", action = "store_true")
 parser.add_argument('--pairs_per_bin', help="Number of cloze pairs to sample per bin, default 20", type = int, default = 20)
 parser.add_argument('--numsent', help="Number of sentences per cloze pair, default 50", type = int, default = 50)
 parser.add_argument('--bins', help="Bins, given as string of comma-separated nubers, default '65,100,220,750,100000'", default = "65,100,220,750,100000")
 
 args = parser.parse_args()
 
-print("Using embeddings to compute selectional constraints?", not(args.selpref_relfreq))
+# settings file
+config = configparser.ConfigParser()
+config.read("settings.txt")
+selpref_method = config["Selpref"]
 
-
+#############
 vgpath_obj = VGPaths(vgdata = args.vgdata, sdsdata = args.output)
 
 # use target words only when they occur
@@ -187,7 +191,7 @@ for frequencybin, objects in bin_objects.items():
 
 print("writing SDS parameters")
     
-vgparam_obj = VGParam(vgpath_obj, selpref_vectors = not(args.selpref_relfreq))
+vgparam_obj = VGParam(vgpath_obj, selpref_method)
 
 global_param, scenario_concept_param, word_concept_param, selpref_param = vgparam_obj.get()
 
