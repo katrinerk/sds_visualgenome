@@ -13,6 +13,7 @@ import numpy as np
 import random
 import statistics
 
+from vgnames import VGOBJECTS, VGATTRIBUTES, VGRELATIONS 
 import vgiterator
 from vgindex import VgitemIndex
 from vgpaths import VGPaths
@@ -109,8 +110,8 @@ class SentencePrinter:
     def write_aux(self, wordliterals, dref_names, dref_wordtype, pred_args, target_dref, targetindex, scenario_concept_assignment):
         ###
         # now write word literals for objects, attributes, relations
-        for wtype, wtype_txt in [("obj", "Objects"), ("att", "Attributes"), ("rel", "Relations")]:
-            if not self.show_attrel_unary and wtype != "obj":
+        for wtype, wtype_txt in [(VGOBJECTS, "Objects"), (VGATTRIBUTES, "Attributes"), (VGRELATIONS, "Relations")]:
+            if not self.show_attrel_unary and wtype != VGOBJECTS:
                 continue
 
             print("--", file = self.outf)
@@ -150,7 +151,7 @@ class SentencePrinter:
         print("Roles", file = self.outf)
 
         for dref in sorted(dref_names.keys()):
-            if dref_wordtype[dref] != "obj":
+            if dref_wordtype[dref] != VGOBJECTS:
                 args = [ ]
                 for arg in sorted(pred_args[dref]):
                     _, dref_d = arg

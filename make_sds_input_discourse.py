@@ -18,6 +18,7 @@ import random
 import configparser
 
 
+from vgnames import VGOBJECTS, VGATTRIBUTES, VGRELATIONS 
 import vgiterator
 from sds_input_util import VGSentences, VGParam
 from vgindex import VgitemIndex
@@ -98,7 +99,7 @@ for sentid, words, roles, in vgsent_obj.each_sentence(vgobj, vgobjects_attr_rel,
 if args.poly:
     poly_obj = SyntheticPolysemes(vgpath_obj, vgindex_obj, vgobjects_attr_rel, scenario_concept_param)
     
-    next_wordid = len(vgobjects_attr_rel["objects"]) + len(vgobjects_attr_rel["attributes"]) + len(vgobjects_attr_rel["relations"])
+    next_wordid = len(vgobjects_attr_rel[VGOBJECTS]) + len(vgobjects_attr_rel[VGATTRIBUTES]) + len(vgobjects_attr_rel[VGRELATIONS])
     paragraph_transformed, goldwords = poly_obj.make(paragraph, next_wordid)
 
     # adapting parameters for new words

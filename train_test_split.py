@@ -16,6 +16,7 @@ from argparse import ArgumentParser
 
 import vgiterator
 from vgpaths import VGPaths
+from vgnames import VGOBJECTS, VGATTRIBUTES, VGRELATIONS 
 
 # where to write the output
 parser = ArgumentParser()
@@ -72,9 +73,9 @@ with zipfile.ZipFile(split_zipfilename, "w", zipfile.ZIP_DEFLATED) as azip:
 trainset = set(out["train"])
 ##
 # compute statistics
-freq_objects = set(vgitems["objects"])
-freq_attributes = set(vgitems["attributes"])
-freq_relations = set(vgitems["relations"])
+freq_objects = set(vgitems[VGOBJECTS])
+freq_attributes = set(vgitems[VGATTRIBUTES])
+freq_relations = set(vgitems[VGRELATIONS])
 
 
 train_objects= Counter()

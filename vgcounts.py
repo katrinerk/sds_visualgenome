@@ -12,6 +12,7 @@ import configparser
 from argparse import ArgumentParser
 
 from vgpaths import VGPaths
+from vgnames import VGOBJECTS, VGATTRIBUTES, VGRELATIONS 
 
 ##
 # initialize, read global parameters
@@ -168,9 +169,9 @@ print()
 
 ##
 # write above-cutoff data to data directory
-out = { "objects" : sorted(list(freq_objects)),
-        "attributes" : sorted(list(freqattr)),
-        "relations" : sorted(list(freqrel)),
+out = { VGOBJECTS : sorted(list(freq_objects)),
+        VGATTRIBUTES : sorted(list(freqattr)),
+        VGRELATIONS : sorted(list(freqrel)),
         "images" : sorted(list(good_images)),
         "image_objid" : image_objid}
 

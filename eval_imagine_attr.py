@@ -16,7 +16,7 @@ from argparse import ArgumentParser
 
 from scipy import stats
 
-
+from vgnames import VGOBJECTS, VGATTRIBUTES, VGRELATIONS 
 import vgiterator
 import sentence_util
 from vgpaths import VGPaths, get_output_path
@@ -67,10 +67,10 @@ with zipfile.ZipFile(vgcounts_zipfilename) as azip:
 # read vectors
 vec_obj = VectorInterface(vgpath_obj)
 
-available_objects = [o for o in vgobjects_attr_rel["objects"] if o in vec_obj.object_vec]
-missing = len(vgobjects_attr_rel["objects"]) - len(available_objects)
+available_objects = [o for o in vgobjects_attr_rel[VGOBJECTS] if o in vec_obj.object_vec]
+missing = len(vgobjects_attr_rel[VGOBJECTS]) - len(available_objects)
 if missing > 0:
-    print("frequent objects without vectors:", missing, "out of", len(vgobjects_attr_rel["objects"]))
+    print("frequent objects without vectors:", missing, "out of", len(vgobjects_attr_rel[VGOBJECTS]))
 
 # randomly sample objects for the training part
 training_objectlabels = random.sample(available_objects, int(args.trainperc * len(available_objects)))

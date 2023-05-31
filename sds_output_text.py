@@ -10,6 +10,7 @@ from collections import defaultdict, Counter
 import numpy as np
 from argparse import ArgumentParser
 
+from vgnames import VGOBJECTS, VGATTRIBUTES, VGRELATIONS 
 import vgiterator
 import sentence_util
 from vgindex import VgitemIndex
@@ -48,7 +49,7 @@ if args.cloze:
         raise Exception("Was expecting cloze info in gold data", zipfilename)
 
     # dictionary of cloze words
-    cloze_dict = dict( (int(wordid_s), (golddata["cloze"]["words"][wordid_s]["word"], golddata["cloze"]["words"][wordid_s].get("ctype", "obj"))) \
+    cloze_dict = dict( (int(wordid_s), (golddata["cloze"]["words"][wordid_s]["word"], golddata["cloze"]["words"][wordid_s].get("ctype", VGOBJECTS))) \
                             for wordid_s in golddata["cloze"]["words"].keys())
 else:
     cloze_dict = None

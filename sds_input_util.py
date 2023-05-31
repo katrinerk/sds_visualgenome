@@ -17,6 +17,11 @@ import math
 import numpy as np
 import random
 
+from sklearn.svm import OneClassSVM
+from sklearn.linear_model import Ridge
+from sklearn.cross_decomposition import PLSRegression
+
+from vgnames import VGOBJECTS, VGATTRIBUTES, VGRELATIONS 
 import vgiterator
 from vgindex import VgitemIndex
 from vec_util import VectorInterface
@@ -55,7 +60,7 @@ class VGParam:
 
         # read vectors?
         self.selpref_method = selpref_method
-        self.vec_obj = VectorInterface(self.vgpath_obj) if self.selpref_method["Method"] == "centroid" else None
+        self.vec_obj = None if self.selpref_method["Method"] == "relfreq" else VectorInterface(self.vgpath_obj)
 
     # obtain data and return it:
     # * global parameters
@@ -84,7 +89,7 @@ class VGParam:
             with azip.open(topicword_filename) as f:
                 term_topic_matrix = np.array(json.load(f))
 
-        num_concepts = len(self.vgobjects_attr_rel["objects"]) + len(self.vgobjects_attr_rel["attributes"]) + len(self.vgobjects_attr_rel["relations"])
+        num_concepts = len(self.vgobjects_attr_rel[VGOBJECTS]) + len(self.vgobjects_attr_rel[VGATTRIBUTES]) + len(self.vgobjects_attr_rel[VGRELATIONS])
         
         ##
         # global data: alpha, number of concepts (objects, attributes, relations), number of scenarios, number of words
@@ -105,22 +110,22 @@ class VGParam:
         conceptindices_tm = []
         # map gensim's word indices to our word indices
         for word in topic_wordlist:
-            if word[:3] =="obj":
-                ix = self.vgindex.o2ix(word[3:])
+            if word.startswith(VGOBJECTS):
+                ix = self.vgindex.o2ix(word[len(VGOBJECTS):])
                 if ix is None:
-                    raise Exception("lookup error for topic word, object", word[3:])
+                    raise Exception("lookup error for topic word, object", word[len(VGOBJECTS):])
                 conceptindices_tm.append(ix)
         
-            elif word[:3] == "att":
-                ix = self.vgindex.a2ix(word[3:])
+            elif word.startswith(VGATTRIBUTES):
+                ix = self.vgindex.a2ix(word[len(VGATTRIBUTES):])
                 if ix is None:
-                    raise Exception("lookup error for topic word, attribute", word[3:])
+                    raise Exception("lookup error for topic word, attribute", word[len(VGATTRIBUTES):])
                 conceptindices_tm.append(ix)
         
-            elif word[:3] == "rel":
-                ix = self.vgindex.r2ix(word[3:])
+            elif word.startswith(VGRELATIONS):
+                ix = self.vgindex.r2ix(word[len(VGRELATIONS):])
                 if ix is None:
-                    raise Exception("lookup error for topic word, relation", word[3:])
+                    raise Exception("lookup error for topic word, relation", word[len(VGRELATIONS):])
                 conceptindices_tm.append(ix)
 
             else:
@@ -197,6 +202,12 @@ class VGParam:
             selpref_json = self.compute_selpref_vectors(attr_count, rel_count_subj, rel_count_obj)
         elif self.selpref_method["Method"] == "relfreq":
             selpref_json = self.compute_selpref_relfreq(attr_count, rel_count_subj, rel_count_obj)
+        elif self.selpref_method["Method"] == "1cclassif":
+            selpref_json = self.compute_selpref_onecclassif(attr_count, rel_count_subj, rel_count_obj)
+        elif self.selpref_method["Method"] == "linreg":
+            selpref_json = self.compute_selpref_regression(attr_count, rel_count_subj, rel_count_obj)
+        elif self.selpref_method["Method"] == "plsr":
+            selpref_json = self.compute_selpref_plsr(attr_count, rel_count_subj, rel_count_obj)
         else:
             raise Exception("Unknown selectional preference method " + str(self.selpref_method["Method"]))
 
@@ -213,9 +224,9 @@ class VGParam:
 
         # store attribute/argument pairs and their weights,
         # rel/subj pairs, rel/obj pairs
-        for cfd, predtype, label in [ (attr_count, "attr", "arg1"), (rel_count_subj, "rel", "arg0"), (rel_count_obj, "rel", "arg1")]:
+        for cfd, predtype, label in [ (attr_count, VGATTRIBUTES, "arg1"), (rel_count_subj, VGRELATIONS, "arg0"), (rel_count_obj, VGRELATIONS, "arg1")]:
             for pred in cfd.conditions():
-                if predtype == "attr":
+                if predtype == VGATTRIBUTES:
                     predix = self.vgindex.a2ix(pred)
                     if predix is None:
                         print("no index found for attrib", pred)
@@ -240,10 +251,10 @@ class VGParam:
 
         # store attribute/argument pairs and their weights,
         # rel/subj pairs, rel/obj pairs
-        for cfd, predtype, label in [ (attr_count, "attr", "arg1"), (rel_count_subj, "rel", "arg0"), (rel_count_obj, "rel", "arg1")]:
+        for cfd, predtype, label in [ (attr_count, VGATTRIBUTES, "arg1"), (rel_count_subj, VGRELATIONS, "arg0"), (rel_count_obj, VGRELATIONS, "arg1")]:
             for pred in cfd.conditions():
                 # predicate index for this predicate
-                if predtype == "attr":
+                if predtype == VGATTRIBUTES:
                     predix = self.vgindex.a2ix(pred)
                     if predix is None:
                         print("no index found for attrib", pred)
@@ -275,7 +286,164 @@ class VGParam:
                 
         return selpref_json
                     
+    ####
+    # compute selectional preferences by training a one-class classifier separately for each predicate plus argument position.
+    # predictions are frequencies of argument occurrences ,which are then normalized to make the weights
+    # arg0/arg1 -> dictionary with entries "config": list of arguments, "weight": list of matching weights
+    def compute_selpref_onecclassif(self, attr_count, rel_count_subj, rel_count_obj):
+        selpref_json = { "arg0" : {"config" : [], "weight" : []},
+                         "arg1" :  {"config" : [], "weight" : [] } }
 
+        # store attribute/argument pairs and their weights,
+        # rel/subj pairs, rel/obj pairs
+        for cfd, predtype, label in [ (attr_count, VGATTRIBUTES, "arg1"), (rel_count_subj, VGRELATIONS, "arg0"), (rel_count_obj, VGRELATIONS, "arg1")]:
+            for pred in cfd.conditions():
+                # predicate index for this predicate
+                if predtype == VGATTRIBUTES:
+                    predix = self.vgindex.a2ix(pred)
+                    if predix is None:
+                        print("no index found for attrib", pred)
+                else:
+                    predix= self.vgindex.r2ix(pred)
+                    if predix is None:
+                        print("no index found for rel", pred)
+
+                # train one-class classifier based on the most frequent arguments
+                X = [ ] 
+                for arglabel, _ in cfd[pred].most_common(100):
+                    if arglabel not in self.vec_obj.object_vec: continue
+                    X.append(self.vec_obj.object_vec[arglabel])
+                cl_obj = OneClassSVM(kernel = "poly").fit(X)
+
+                all_objlabels = list(self.vec_obj.object_vec.keys())
+                Xtest = [ self.vec_obj.object_vec[o] for o in all_objlabels]
+                predicted_yn = cl_obj.predict(Xtest)
+
+                # log (1 / number of yeses)
+                num_yes = sum([int(v == 1) for v in predicted_yn])
+                if num_yes == 0:
+                    # print("got no 1's for", pred, "values:", predicted_yn)
+                    continue
+                
+                weight = -math.log(num_yes)
+                
+                for arg, yn in zip(all_objlabels, predicted_yn):
+                    if yn > 0:
+                        selpref_json[label]["config"].append( (predix, self.vgindex.o2ix(arg)))
+                        selpref_json[label]["weight"].append( weight)
+                
+        return selpref_json
+                    
+
+    ####
+    # compute selectional preferences by training a regression model for each predicate + argument position.
+    # predictions are frequencies of argument occurrences ,which are then normalized to make the weights
+    # arg0/arg1 -> dictionary with entries "config": list of arguments, "weight": list of matching weights
+    def compute_selpref_regression(self, attr_count, rel_count_subj, rel_count_obj):
+        selpref_json = { "arg0" : {"config" : [], "weight" : []},
+                         "arg1" :  {"config" : [], "weight" : [] } }
+
+        # store attribute/argument pairs and their weights,
+        # rel/subj pairs, rel/obj pairs
+        for cfd, predtype, label in [ (attr_count, VGATTRIBUTES, "arg1"), (rel_count_subj, VGRELATIONS, "arg0"), (rel_count_obj, VGRELATIONS, "arg1")]:
+            for pred in cfd.conditions():
+                # predicate index for this predicate
+                if predtype == VGATTRIBUTES:
+                    predix = self.vgindex.a2ix(pred)
+                    if predix is None:
+                        print("no index found for attrib", pred)
+                else:
+                    predix= self.vgindex.r2ix(pred)
+                    if predix is None:
+                        print("no index found for rel", pred)
+
+                # train a ridge regression model
+                X = [ ]
+                y = [ ]
+                # add words with nonzero counts
+                num_items = sum(cfd[pred].values())
+                for arglabel, count in cfd[pred].items():
+        
+                    if arglabel not in self.vec_obj.object_vec: continue
+                    X.append(self.vec_obj.object_vec[arglabel])
+                    y.append( 1000 * (count / num_items))
+                # add some words with zero counts
+                seen_args = set(cfd[pred].keys())
+                unseen_args = [o for o in self.vec_obj.object_vec.keys() if o not in seen_args]
+                prev_rand_state= random.getstate()
+                arglabels = random.sample(unseen_args, min(len(unseen_args), int(len(seen_args)/2)))
+                random.setstate(prev_rand_state)
+                for arglabel in unseen_args:
+                    if arglabel not in seen_args:
+                        X.append(self.vec_obj.object_vec[arglabel])
+                        y.append(0)
+                    
+                cl_obj = Ridge()
+                cl_obj.fit(X, y)
+
+                all_objlabels = list(self.vec_obj.object_vec.keys())
+                Xtest = [ self.vec_obj.object_vec[o] for o in all_objlabels]
+                predicted = cl_obj.predict(Xtest)
+                # map numbers < 0 to 0
+                predicted = np.where(predicted < 0.0, 0.0, predicted)
+
+                if sum(predicted) == 0.0:
+                    # no positive predictions
+                    print("no positive predictions for", pred)
+                    continue
+                
+                normalizer = math.log(sum(predicted))
+
+                # print(pred , label)
+                for arg, wt in zip(all_objlabels, predicted):
+                    if wt > 0:
+                        selpref_json[label]["config"].append( (predix, self.vgindex.o2ix(arg)))
+                        selpref_json[label]["weight"].append( math.log(wt) - normalizer)
+                
+        return selpref_json
+
+
+    ####
+    # compute selectional preferences by training a regression model for each argument position, across predicates.
+    # predictions are frequencies of argument occurrences ,which are then normalized to make the weights
+    # arg0/arg1 -> dictionary with entries "config": list of arguments, "weight": list of matching weights
+    def compute_selpref_plsr(self, attr_count, rel_count_subj, rel_count_obj, num_plsr_components = 20):
+        selpref_json = { "arg0" : {"config" : [], "weight" : []},
+                         "arg1" :  {"config" : [], "weight" : [] } }
+
+        all_args = list(self.vec_obj.object_vec.keys())
+        # independent variables matrix: the same for all three classifiers,
+        # list of object vectors in order
+        X = [ self.vec_obj.object_vec[a] for a in all_args]
+
+        # store attribute/argument pairs and their weights,
+        # rel/subj pairs, rel/obj pairs
+        for cfd, predtype, label in [ (attr_count, VGATTRIBUTES, "arg1"), (rel_count_subj, VGRELATIONS, "arg0"), (rel_count_obj, VGRELATIONS, "arg1")]:
+            cl_obj = pls2 = PLSRegression(n_components=num_plsr_components)
+            Y = [ ]
+            all_preds = [p for p in cfd.conditions() if cfd[p].N() > 0]
+            
+            for arg in all_args:
+                Y.append( [1000 * (cfd[pred][arg] / cfd[pred].N()) for pred in all_preds])
+                
+            cl_obj.fit(X, Y)
+            predicted = cl_obj.predict(X)
+
+            for ipred, pred in enumerate(all_preds):
+                predix = self.vgindex.a2ix(pred) if predtype == VGATTRIBUTES else self.vgindex.r2ix(pred)
+                pred_predictions = np.copy(predicted[:, ipred])
+                pred_predictions = np.where(pred_predictions < 0, 0, pred_predictions)
+                if np.sum(pred_predictions) == 0:
+                    continue
+                normalizer = np.log(np.sum(pred_predictions))
+                
+                for arg, wt in zip(all_args, pred_predictions):
+                    if wt > 0:
+                        selpref_json[label]["config"].append( (predix, self.vgindex.o2ix(arg)))
+                        selpref_json[label]["weight"].append( math.log(wt) - normalizer)
+                
+        return selpref_json
+    
     #####
     # write parameters to files
     def write(self, global_param, concept_scenario, word_concept, selpref_json):
@@ -359,23 +527,19 @@ class VGSentences:
         found = 0
         notfound = 0
         for img in image_objects:
-            this_image_notfound = [ ]
             # all object IDs for this image
             ids = [iid for _, iid in image_objects[img]]
  
             for attr, objid in image_attr.get(img, []):
                 if objid not in ids:
                         notfound += 1
-                        this_image_notfound.append( ("attr", attr, objid))
                 else: found += 1
             for rel, subjid, objid in image_rel.get(img, []):
                 if subjid not in ids:
                         notfound += 1
-                        this_image_notfound.append( ("relsubj", rel, subjid))
                 else: found += 1
                 if objid not in ids:
                         notfound += 1
-                        this_image_notfound.append( ("relobj", rel, objjid))
                 else: found += 1
 
 

@@ -7,7 +7,9 @@ import os
 import json
 import zipfile
 from collections import defaultdict, Counter
+
 from vgpaths import VGPaths
+from vgnames import VGOBJECTS, VGATTRIBUTES, VGRELATIONS 
 
 
 class VGIterator:
@@ -25,9 +27,9 @@ class VGIterator:
                 with azip.open(vgcounts_filename) as f:
                     vgcounts = json.load(f)
         
-        self.frequent_objects = set(vgcounts["objects"])
-        self.frequent_attrib = set(vgcounts["attributes"])
-        self.frequent_rel = set(vgcounts["relations"])
+        self.frequent_objects = set(vgcounts[VGOBJECTS])
+        self.frequent_attrib = set(vgcounts[VGATTRIBUTES])
+        self.frequent_rel = set(vgcounts[VGRELATIONS])
         self.image_objid = vgcounts["image_objid"]
 
     # iterate over each image, yield its sufficiently frequent objects as their names (not synsets)

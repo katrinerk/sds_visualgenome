@@ -8,6 +8,9 @@ import re
 # using gensim for computing cosines
 from gensim.models import KeyedVectors
 
+from vgnames import VGOBJECTS, VGATTRIBUTES, VGRELATIONS 
+
+
 class VectorInterface:
     def __init__(self, vgpath_obj):
         vecfilename = vgpath_obj.vg_vecfilename()
@@ -115,18 +118,18 @@ class VectorInterface:
 
         # and return as list of pairs (object label, sim)
         return [  (self.object_kv_index_key[ix], sim) for ix, sim in enumerate(sims.tolist()) ]
-        sortedlist = sorted([ (self.object_kv_index_key[ix], sim) for ix, sim in enumerate(sims.tolist())], key = lambda p:p[1], reverse = True)
-        return [(ix, sim) for ix, sim in sortedlist if sim > 0]
+        # sortedlist = sorted([ (self.object_kv_index_key[ix], sim) for ix, sim in enumerate(sims.tolist())], key = lambda p:p[1], reverse = True)
+        # return [(ix, sim) for ix, sim in sortedlist if sim > 0]
 
     # all similarities, to this label, ranked highest to lowest,
     # where type = object, attr, predarg0, predarg1
     def ranked_sims(self, label, elltype):
-        if elltype == "object":
+        if elltype == VGOBJECTS:
             simfunc = self.object_kv.similar_by_key
             keydict = self.object_kv_index_key
             tlabel = label
         
-        elif elltype == "attr":
+        elif elltype == VGATTRIBUTES:
             simfunc = self.attrib_kv.similar_by_key
             keydict = self.attrib_kv_index_key
             tlabel = label

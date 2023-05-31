@@ -17,6 +17,7 @@ from argparse import ArgumentParser
 import configparser
 
 
+from vgnames import VGOBJECTS, VGATTRIBUTES, VGRELATIONS 
 import vgiterator
 from sds_input_util import VGSentences, VGParam
 from vgindex import VgitemIndex
@@ -126,7 +127,7 @@ for lower, upper in bins:
 # record them in the gold object
 
 # ID of the next word: one past all the objects, attributes, relations we have so far
-next_wordid = len(vgobjects_attr_rel["objects"]) + len(vgobjects_attr_rel["attributes"]) + len(vgobjects_attr_rel["relations"])
+next_wordid = len(vgobjects_attr_rel[VGOBJECTS]) + len(vgobjects_attr_rel[VGATTRIBUTES]) + len(vgobjects_attr_rel[VGRELATIONS])
 # overall number of cloze words
 num_clozewords = 0
 # mapping concept ID -> cloze word id

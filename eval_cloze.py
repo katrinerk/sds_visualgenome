@@ -15,6 +15,7 @@ import vgiterator
 import sentence_util
 from vgindex import VgitemIndex
 from vgpaths import VGPaths, get_output_path
+from vgnames import VGOBJECTS, VGATTRIBUTES, VGRELATIONS 
 
 ########
 
@@ -155,7 +156,7 @@ topic_obj = sentence_util.TopicInfoUtil(vgpath_obj)
 # dictionary of cloze words
 cloze_dict = { }
 for wordid_s in golddata["cloze"]["words"].keys():
-    cloze_dict[ int(wordid_s)] = (golddata["cloze"]["words"][wordid_s]["word"], "obj")
+    cloze_dict[ int(wordid_s)] = (golddata["cloze"]["words"][wordid_s]["word"], VGOBJECTS)
 
 vgindex_obj = VgitemIndex(vgobjects_attr_rel, additional_dict = cloze_dict)
     

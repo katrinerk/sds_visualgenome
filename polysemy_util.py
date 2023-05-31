@@ -11,6 +11,7 @@ import math
 import numpy as np
 import random
 
+from vgnames import VGOBJECTS, VGATTRIBUTES, VGRELATIONS 
 import vgiterator
 from sds_input_util import VGSentences, VGParam
 from vgindex import VgitemIndex
@@ -19,7 +20,7 @@ from vec_util import VectorInterface
 from vgpaths import VGPaths
 
 class SyntheticPolysemes:
-    def __init__(self, vgpath_obj, vgindex_obj, frequent_words, concept_scenario_mapping, max_fraction = 0.5):
+    def __init__(self, vgpath_obj, vgindex_obj, frequent_words, concept_scenario_mapping, max_fraction = 1.0, wordbins = None):
 
         # store global data
         self.vec_obj = VectorInterface(vgpath_obj)
@@ -28,6 +29,7 @@ class SyntheticPolysemes:
         self.concept_scenario_mapping = concept_scenario_mapping
 
         self.max_fraction = max_fraction
+        self.wordbins = wordbins
 
         # in rankings of similarity among words,
         # make bins of degrees of similarity
@@ -51,14 +53,16 @@ class SyntheticPolysemes:
     # returns: transformed sentences, along with
     # characterizations of the new polysemous "words"
     def make(self, sentences, next_wordid, simlevel = 3, singleword = False):
+        print("simlevel:", simlevel)
 
         gold = {}
 
 
         sentences_transformed = [ ]
         
-        ctype_map = {"object" : "obj", "attr" : "att", "predarg0" : "rel", "predarg1" : "rel", "rel" : "rel"}
+        ctype_map = {VGOBJECTS : VGOBJECTS, VGATTRIBUTES:VGATTRIBUTES, VGRELATIONS:VGRELATIONS, "predarg0" : VGRELATIONS, "predarg1" : VGRELATIONS}
 
+        random.seed(500)
 
         for sentid, words, roles in sentences:
 
@@ -132,10 +136,10 @@ class SyntheticPolysemes:
     def make_obj_cloze(self, conceptid, simlevel):
         conceptlabel, _ = self.vgix_obj.ix2l(conceptid)
         # can we make a cloze partner for this word?
-        if conceptlabel not in self.vgfrequent_words["objects"] or conceptlabel not in self.vec_obj.object_vec.keys() or conceptid not in self.concept_scenario_mapping:
+        if conceptlabel not in self.vgfrequent_words[VGOBJECTS] or conceptlabel not in self.vec_obj.object_vec.keys() or conceptid not in self.concept_scenario_mapping:
             return None
 
-        retv = self._sample_clozepair("object", conceptlabel, simlevel)
+        retv = self._sample_clozepair(VGOBJECTS, conceptlabel, simlevel)
         if retv is None:
             return None
 
@@ -154,7 +158,7 @@ class SyntheticPolysemes:
         dref_obj = defaultdict(list)
         for _, conceptid, dref in words:
             conceptlabel, ctype = self.vgix_obj.ix2l(conceptid)
-            if ctype == "obj":
+            if ctype == VGOBJECTS:
                 dref_obj[dref].append(conceptlabel)
 
         ###
@@ -178,27 +182,27 @@ class SyntheticPolysemes:
             _, conceptid, dref = wordentry
             conceptlabel, ctype = self.vgix_obj.ix2l(conceptid)
 
-            if ctype == "obj":
+            if ctype == VGOBJECTS:
                 # object: no currying necessary. but is this frequent enough?
-                # if conceptlabel not in self.vgfrequent_words["objects"]:
+                # if conceptlabel not in self.vgfrequent_words[VGOBJECTS]:
                 #     print("rare object", conceptlabel)
                 # if conceptlabel not in self.vec_obj.object_vec.keys():
                 #     print("no vector for", conceptlabel)
                 # if conceptid not in self.concept_scenario_mapping:
                 #     print("no scenario for", conceptlabel, conceptid)
-                if conceptlabel in  self.vgfrequent_words["objects"] and conceptlabel in self.vec_obj.object_vec.keys() and conceptid in self.concept_scenario_mapping:
+                if conceptlabel in  self.vgfrequent_words[VGOBJECTS] and conceptlabel in self.vec_obj.object_vec.keys() and conceptid in self.concept_scenario_mapping:
                     # yes, usable
-                    retv.append( ("object",conceptlabel, wordix) )
+                    retv.append( (VGOBJECTS,conceptlabel, wordix) )
 
-            elif ctype == "att":
+            elif ctype == VGATTRIBUTES:
                 # attribute: no currying necessary. but is this frequent enough?
-                if conceptlabel in  self.vgfrequent_words["attributes"] and conceptlabel in self.vec_obj.attrib_vec.keys() and conceptid in self.concept_scenario_mapping:
+                if conceptlabel in  self.vgfrequent_words[VGATTRIBUTES] and conceptlabel in self.vec_obj.attrib_vec.keys() and conceptid in self.concept_scenario_mapping:
                     # yes, usable
-                    retv.append( ( "attr", conceptlabel, wordix) )
+                    retv.append( ( VGATTRIBUTES, conceptlabel, wordix) )
 
             else:
                 # relation: we need to curry this, if it's frequent enough
-                if conceptlabel in self.vgfrequent_words["relations"] and conceptid in self.concept_scenario_mapping:
+                if conceptlabel in self.vgfrequent_words[VGRELATIONS] and conceptid in self.concept_scenario_mapping:
                     # may be usable if the argument is frequent enough
                     if dref not in arg0_drefh_drefd or dref not in arg1_drefh_drefd:
                         # no arguments recorded, skip
@@ -219,16 +223,27 @@ class SyntheticPolysemes:
 
 
     #############3
+    # for a word of given type (wordtype: object, attr, rel) and label (wordinfo),
+    # sample a cloze word for the given similarity level.
+    # * if rel, take apart predicate and argument
+    # * obtain list of neighbors from vector object
+    # * optionally restrict neighbor list to correct frequency bin
+    # * call sampling function
+    # * obtain both word labels and word IDs
     def _sample_clozepair(self, wordtype, wordinfo, simlevel):
 
         # determine ranked similarities
-        if wordtype == "object":
+        if wordtype == VGOBJECTS:
             # object: wordinfo is simply a concept label
 
             word1 = wordinfo
 
             # compute similarity based on embeddings
             neighbors = [n for n, _ in self.vec_obj.ranked_sims(word1, wordtype)[1:] if self.vgix_obj.isobj(n)]
+            if self.wordbins:
+                neighbors = [ n for n in neighbors if n in self._same_wordbin(word1, wordtype)]
+            if len(neighbors) == 0:
+                return None
 
             # sample a 2nd word in simlevel, return its index and the percentile of the index
             word2index, word2rank = self._sample_cloze_fromlist(neighbors, simlevel)
@@ -238,13 +253,17 @@ class SyntheticPolysemes:
             word1id = self.vgix_obj.o2ix(word1) 
             word2id = self.vgix_obj.o2ix(word2)
 
-        elif wordtype == "attr":
+        elif wordtype == VGATTRIBUTES:
             # object: wordinfo is simply a concept label
 
             word1 = wordinfo
 
             # compute similarity based on embeddings
             neighbors = [n for n, _ in self.vec_obj.ranked_sims(word1, wordtype)[1:] if self.vgix_obj.isatt(n)]
+            if self.wordbins:
+                neighbors = [ n for n in neighbors if n in self._same_wordbin(word1, wordtype)]
+            if len(neighbors) == 0:
+                return None
 
             # sample a 2nd word in simlevel, return its index and the percentile of the index
             word2index, word2rank = self._sample_cloze_fromlist(neighbors, simlevel)
@@ -254,7 +273,7 @@ class SyntheticPolysemes:
             word1id = self.vgix_obj.a2ix(word1) 
             word2id = self.vgix_obj.a2ix(word2)
 
-        elif wordtype == "rel":
+        elif wordtype == VGRELATIONS:
             # relation: wordtype is a list of triples (predarg0/1, predlabel, arglabel)
             # sample one of the triples, determine neighbors
             argtype, pred1, arg1 = random.choice(wordinfo)
@@ -262,9 +281,13 @@ class SyntheticPolysemes:
 
             # filter neighbors: have to have different pred, same arg
             neighbors = [n[0] for n, _ in self.vec_obj.ranked_sims((pred1, arg1), argtype)[1:] if self.vgix_obj.isrel(n[0]) and n[0] != pred1 and n[1] == arg1]
+
+            if self.wordbins:
+                neighbors = [ n for n in neighbors if n in self._same_wordbin(word1, wordtype)]
             if len(neighbors) == 0:
                 # print("No neighbors for pred/arg pair, skipping:", pred1, arg1, argtype)
                 return None
+
 
             # sample a 2nd word in simlevel, return its index and the percentile of the index        
             word2index, word2rank = self._sample_cloze_fromlist(neighbors, simlevel)
@@ -290,7 +313,13 @@ class SyntheticPolysemes:
         return (word1, word1id, word2, word2id, word2rank)
 
 
+    ##
+    # sample a cloze word from a list of words, matching the similarity level
+    # if there are too few neighbors, sample without level match
     def _sample_cloze_fromlist(self, neighbors, simlevel):
+        if len(neighbors) == 0:
+            return (None, None)
+        
         if simlevel < 0:
             # simlevel not set?
             # choose one of the simlevels at random
@@ -311,3 +340,15 @@ class SyntheticPolysemes:
         word2rank = index / len(neighbors)
 
         return (index, word2rank)
+
+    ##
+    # binning: find the first bin for the right word type
+    # that contains the given word
+    def _same_wordbin(self, word, wordtype):
+        if self.wordbins is None:
+            return None
+
+        for wordbin in self.wordbins[wordtype]:
+            if word in wordbin: return wordbin
+
+        raise Exception(f"Error no wordbin found for {word} / {wordtype}")

@@ -14,6 +14,7 @@ import statistics
 from argparse import ArgumentParser
 import configparser
 
+from vgnames import VGOBJECTS, VGATTRIBUTES, VGRELATIONS 
 import vgiterator
 from vgindex import VgitemIndex
 from vgpaths import VGPaths
@@ -273,7 +274,7 @@ if args.cloze:
         raise Exception("Was expecting cloze info in gold data", zipfilename)
 
     # dictionary of cloze words
-    cloze_dict = dict( (int(wordid_s), (golddata["cloze"]["words"][wordid_s]["word"], golddata["cloze"]["words"][wordid_s].get("ctype", "obj"))) \
+    cloze_dict = dict( (int(wordid_s), (golddata["cloze"]["words"][wordid_s]["word"], golddata["cloze"]["words"][wordid_s].get("ctype", VGOBJECTS))) \
                             for wordid_s in golddata["cloze"]["words"].keys())
 else:
     cloze_dict = None

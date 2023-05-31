@@ -16,7 +16,7 @@ import configparser
 
 from scipy import stats
 
-
+from vgnames import VGOBJECTS, VGATTRIBUTES, VGRELATIONS 
 import vgiterator
 import sentence_util
 from vgpaths import VGPaths, get_output_path
@@ -121,7 +121,7 @@ counter = 0
 
 # make cloze of argument
 poly_obj = SyntheticPolysemes(vgpath_obj, vgindex_obj, vgobjects_attr_rel, scenario_concept_param)
-next_wordid = len(vgobjects_attr_rel["objects"]) + len(vgobjects_attr_rel["attributes"]) + len(vgobjects_attr_rel["relations"])
+next_wordid = len(vgobjects_attr_rel[VGOBJECTS]) + len(vgobjects_attr_rel[VGATTRIBUTES]) + len(vgobjects_attr_rel[VGRELATIONS])
 
 while True:
     # sample a test sentence

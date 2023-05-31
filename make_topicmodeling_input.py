@@ -15,7 +15,7 @@ import math
 import gensim
 from argparse import ArgumentParser
 
-
+from vgnames import VGOBJECTS, VGATTRIBUTES, VGRELATIONS 
 from vgpaths import VGPaths
 import vgiterator
 
@@ -51,15 +51,15 @@ img_contents = {}
 
 print("reading training images")
 for img, obj in vgobj.each_image_objects(img_ids = trainset):
-    img_contents[img] = ["obj" + o for o in obj]
+    img_contents[img] = [VGOBJECTS + o for o in obj]
 
 for img, attr in vgobj.each_image_attributes(img_ids = trainset):
     for a in attr:
-        img_contents[img].append("att" + a)
+        img_contents[img].append(VGATTRIBUTES + a)
 
 for img, rel in vgobj.each_image_relations(img_ids = trainset):
     for r in rel:
-        img_contents[img].append("rel" + r)
+        img_contents[img].append(VGRELATIONS + r)
 
 
 ##

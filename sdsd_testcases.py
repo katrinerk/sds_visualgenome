@@ -17,7 +17,7 @@ from argparse import ArgumentParser
 import random
 import configparser
 
-
+from vgnames import VGOBJECTS, VGATTRIBUTES, VGRELATIONS 
 import vgiterator
 from sds_input_util import VGParam
 from vgindex import VgitemIndex
@@ -113,7 +113,7 @@ class PossiblePolysemy:
 
         param_scenario_concept = dict((int(c), slist) for c, slist in sds_obj.param_scenario_concept.items())
         self.poly_obj = SyntheticPolysemes(vgpath_obj, vgindex_obj, vgobjects_attr_rel, param_scenario_concept) if self.do_polysemy else None
-        self.next_wordid = len(vgobjects_attr_rel["objects"]) + len(vgobjects_attr_rel["attributes"]) + len(vgobjects_attr_rel["relations"])
+        self.next_wordid = len(vgobjects_attr_rel[VGOBJECTS]) + len(vgobjects_attr_rel[VGATTRIBUTES]) + len(vgobjects_attr_rel[VGRELATIONS])
 
         self.global_param = sds_obj.param_general.copy()
         self.word_concept_param = sds_obj.param_word_concept.copy()
@@ -167,7 +167,7 @@ paragraphs = [
             [0, [["w", 577,0], ["w", 3769, 1], ["r", "arg1", 1, 0]]],
             [1, [["prew", 577, 0]]]
         ]
-    ), 
+    ),
     ( "a black cat. the black cat.", 
           [
             [0, [["w", 577,0], ["w", 3769, 1], ["r", "arg1", 1, 0]]],
@@ -186,6 +186,12 @@ paragraphs = [
             [1, [["prew", 577, 0], ["prew", 3769, 1], ["prer", "arg1", 1, 0]]]
         ]
     ),
+    (" a black cat and a black car. the black cat.",
+         [
+            [0, [["w", 577,0], ["w", 3769, 1], ["r", "arg1", 1, 0], ["w", 550, 2], ["w", 3769, 3], ["r", "arg1", 3, 2]]],
+            [1, [["prew", 577, 0], ["prew", 3769, 1], ["prer", "arg1", 1, 0]]]
+        ]
+    ),      
     ( "a cat on a roof. the cat.", 
           [
             [0, [["w", 577,0], ["w", 2401, 1], ["w", 5501, 2], ["r", "arg0", 2, 0], ["r", "arg1", 2, 1]]],

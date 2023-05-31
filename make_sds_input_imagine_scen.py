@@ -15,7 +15,7 @@ import random
 from argparse import ArgumentParser
 import configparser
 
-
+from vgnames import VGOBJECTS, VGATTRIBUTES, VGRELATIONS 
 import vgiterator
 from sds_input_util import VGSentences, VGParam
 from vgindex import VgitemIndex
@@ -114,7 +114,7 @@ gold = { "imagine_scen" : { }}
 for sentid, words, roles in testsentences:
     # determine which unary literals refer to objects,
     # as we are only downsampling those
-    object_literals = [ (w, labelid, dref) for w, labelid, dref in words if vgindex_obj.ix2l(labelid)[1] == "obj"]
+    object_literals = [ (w, labelid, dref) for w, labelid, dref in words if vgindex_obj.ix2l(labelid)[1] == VGOBJECTS]
 
     num_to_remove = len(object_literals) - args.maxobj if len(object_literals) > args.maxobj else int(len(object_literals) * args.testfrac)
 

@@ -14,6 +14,8 @@ import numpy as np
 
 from sklearn.cross_decomposition import PLSRegression
 
+from vgnames import VGOBJECTS, VGATTRIBUTES, VGRELATIONS 
+
 
 class ImagineScen:
     def __init__(self, vgpath_obj, vgindex_obj):
@@ -37,10 +39,10 @@ class ImagineScen:
         self.indices_of_objects = [ ]
         self.object_ids = [ ]
         for index, word in enumerate(topic_wordlist):
-            if word[:3] =="obj":
-                wordid = vgindex_obj.o2ix(word[3:])
+            if word.startswith(VGOBJECTS):
+                wordid = vgindex_obj.o2ix(word[len(VGOBJECTS):])
                 if wordid is None:
-                    raise Exception("lookup error for topic word, object", word[3:])
+                    raise Exception("lookup error for topic word, object", word[len(VGOBJECTS):])
 
                 self.object_ids.append(wordid)
                 self.indices_of_objects.append(index)

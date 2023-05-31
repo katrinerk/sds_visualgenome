@@ -1,0 +1,3 @@
+VGOBJECTS = "obj"
+VGATTRIBUTES = "att"
+VGRELATIONS = "rel"

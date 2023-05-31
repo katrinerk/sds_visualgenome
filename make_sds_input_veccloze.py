@@ -17,6 +17,7 @@ import random
 from argparse import ArgumentParser
 import configparser
 
+from vgnames import VGOBJECTS, VGATTRIBUTES, VGRELATIONS 
 import vgiterator
 from sds_input_util import VGSentences, VGParam
 from vgindex import VgitemIndex
@@ -35,6 +36,9 @@ parser.add_argument('--numsent', help="Number of sentences to use, default 2000"
 parser.add_argument('--maxlen', help="maximum sentence length, default = 25", type = int, default = 25)
 parser.add_argument('--simlevel', help="choose cloze pairs only in this similarity range: 0-3, 0 is most similar, default: no restriction", type =int, default = -1)
 parser.add_argument('--singleword', help="only one ambiguous word per sentence. default:False", action= "store_true")
+parser.add_argument('--polyfraction', help="up to this fraction of words per sentence can be polysemous, default: 1.0", type=float, default = 1.0)
+parser.add_argument('--test', help = "evaluate on test sentences rather than dev. Default: false.", action = "store_true")
+parser.add_argument('--freqmatch', help = "select cloze words only from bin of words with similar frequencies. Default: false", action = "store_true")
 
 args = parser.parse_args()
 
@@ -48,6 +52,17 @@ config = configparser.ConfigParser()
 config.read("settings.txt")
 selpref_method = config["Selpref"]
 
+if args.test:
+    testsection = "test"
+else:
+    testsection = "dev"
+
+print("Testing on section:", testsection)
+print("Selectional preferences:", selpref_method["Method"])
+print("sim level:", args.simlevel)
+print("polysemy fraction:", args.polyfraction)
+print("frequency matched cloze words:", args.freqmatch)
+          
 ##########################
 # read data
 print("Reading data")
@@ -68,8 +83,6 @@ with zipfile.ZipFile(split_zipfilename) as azip:
         traintest_split = json.load(f)
     
 trainset = set(traintest_split["train"])
-
-random.seed(543)
 
 vgindex_obj = VgitemIndex(vgobjects_attr_rel)
 
@@ -106,15 +119,49 @@ vgsent_obj = VGSentences(vgpath_obj)
 
 # sentences: tuples (sentence ID, word literals, word literals that need to be kept, role literals)
 testsentences = [ ]
-for sentence in vgsent_obj.each_sentence(vgiter, vgobjects_attr_rel, traintest_split, "test"):
+for sentence in vgsent_obj.each_sentence(vgiter, vgobjects_attr_rel, traintest_split, testsection):
     testsentences.append( sentence)
 
+random.seed(543)
 use_testsentences = random.sample(testsentences, args.numsent)
 
+# downsample testsentences now, so that when we select candidates for polysemy later,
+# we'll have a better chance of them being adjacent to each other in terms of
+# semantic roles
+use_testsentences = [ vgsent_obj.transform_sentence_downsample( (sentid, words, [], roles), sentlength_cap = args.maxlen) for sentid, words, roles in use_testsentences]
+
+
+################################################
+# binning
+def make_wordbins(wordix_counter, vgindex_obj):
+    binstr = "65,100,220,750,10000000"
+    bin_ends = [int(b) for b in binstr.split(",")]
+    bin_start = 0
+    bins = [ ]
+    for b in bin_ends:
+        bins.append( (bin_start, b) )
+        bin_start = b
+
+    print("Bins:", bins)
+    wordbins = { }
+    for wordtype in [VGOBJECTS, VGATTRIBUTES, VGRELATIONS]:
+        # map wordindex, count -> word, count, but keep only the words of the right word type
+        words_this_wordtype = [ (vgindex_obj.ix2l(wordix)[0], count) for wordix, count in wordix_counter.items() if vgindex_obj.ix2l(wordix)[1] == wordtype]
+        
+        wordbins[wordtype] = [ ]
+        for b_start, b_end in bins:
+            wordbins[wordtype].append( set(w for w, count in words_this_wordtype if count >= b_start and count < b_end))
+
+        # if wordtype == VGATTRIBUTES:
+        #     print([(w, c) for w, c in words_this_wordtype if w == "white"], ["white" in b for b in wordbins[wordtype]])
+
+    return wordbins
+    
 ################################################
 # transform each test sentence
 
-poly_obj = SyntheticPolysemes(vgpath_obj, vgindex_obj, vgobjects_attr_rel, scenario_concept_param)
+wordbins = make_wordbins(baseline_counter, vgindex_obj) if args.freqmatch else None
+poly_obj = SyntheticPolysemes(vgpath_obj, vgindex_obj, vgobjects_attr_rel, scenario_concept_param, max_fraction = args.polyfraction, wordbins = wordbins)
         
 ################################################
 # now actually transform test sentences
@@ -122,7 +169,7 @@ poly_obj = SyntheticPolysemes(vgpath_obj, vgindex_obj, vgobjects_attr_rel, scena
     
 # make word IDs for cloze words:
 # next word ID is the one after all the objects, attributes, relations so far.
-next_wordid = len(vgobjects_attr_rel["objects"]) + len(vgobjects_attr_rel["attributes"]) + len(vgobjects_attr_rel["relations"])
+next_wordid = len(vgobjects_attr_rel[VGOBJECTS]) + len(vgobjects_attr_rel[VGATTRIBUTES]) + len(vgobjects_attr_rel[VGRELATIONS])
 
 testsentences_transformed, goldwords = poly_obj.make(use_testsentences, next_wordid, simlevel = args.simlevel, singleword = args.singleword)
 
@@ -165,8 +212,9 @@ vgsent_obj = VGSentences(vgpath_obj)
     
         
 ###
-# write sentences to file
-vgsent_obj.write(testsentences_transformed, sentlength_cap = args.maxlen)
+# write sentences to file.
+# no sentence length cap here because we downsampled earlier
+vgsent_obj.write(testsentences_transformed, sentlength_cap = None)
 
 
 ###

@@ -11,6 +11,7 @@ import numpy as np
 from argparse import ArgumentParser
 import random
 
+from vgnames import VGOBJECTS, VGATTRIBUTES, VGRELATIONS 
 import vgiterator
 import sentence_util
 from vgindex import VgitemIndex
@@ -68,7 +69,7 @@ with zipfile.ZipFile(zipfilename) as azip:
         model_data = json.load(f)
 
 # dictionary of cloze words
-cloze_dict = dict( (int(wordid_s), (golddata["cloze"]["words"][wordid_s]["word"], golddata["cloze"]["words"][wordid_s].get("ctype", "obj"))) \
+cloze_dict = dict( (int(wordid_s), (golddata["cloze"]["words"][wordid_s]["word"], golddata["cloze"]["words"][wordid_s].get("ctype", VGOBJECTS))) \
                             for wordid_s in golddata["cloze"]["words"].keys())
 
 vgindex_obj = VgitemIndex(vgobjects_attr_rel, additional_dict = cloze_dict)
@@ -167,7 +168,7 @@ with open(outpath, "w") as outf:
         print("--------Sentence", sentid, "----------", file = outf)
         for wordindex, word_id, modelconcept, goldconcept, baseconcept in clozedata:
             accword = "correct" if goldconcept == modelconcept else "incorr."
-            print("Word no.", wordindex, accword, "gold", "'" + vgindex_obj.ix2l(goldconcept)[0] + "'", "assigned", "'" + vgindex_obj.ix2l(modelconcept)[0] + "'", file = outf)
+            print("Word no.", wordindex, accword, "gold", "'" + "/".join(vgindex_obj.ix2l(goldconcept)) + "'", "assigned", "'" + "/".join(vgindex_obj.ix2l(modelconcept)) + "'", file = outf)
 
         print(file = outf)
         out_obj.write_sentence(sentid_sent[sentid])
