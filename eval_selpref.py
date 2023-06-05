@@ -29,7 +29,6 @@ from sds_input_util import VGSentences, VGParam
 # input
 
 parser = ArgumentParser()
-# parser.add_argument('--output', help="directory to write output to, default: sds_in/selpref", default = "sds_in/selpref/")
 parser.add_argument('--vgdata', help="directory with VG data including frequent items, train/test split, topic model", default = "data/")
 parser.add_argument('--test', help = "evaluate on test sentences rather than dev. Default: false.", action = "store_true")
 parser.add_argument('--numpts', help="number of predicate/role pairs to sample for evaluation, default 3000", type = int, default = 3000)
