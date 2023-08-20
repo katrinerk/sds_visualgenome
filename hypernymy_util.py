@@ -4,6 +4,8 @@
 import sys
 import random
 import nltk
+import math
+from collections import defaultdict, Counter
 from nltk.corpus import wordnet
 from sklearn.linear_model import LogisticRegression
 
@@ -20,6 +22,7 @@ class HypernymHandler:
 
         # compute hypernyms for given object labels
         self.hypernym_names, self.object_hypernyms = self._determine_object_hypernyms(vgobjects)
+        self.object_names = sorted(list(self.object_hypernyms.keys()))
 
         # empty initializations for train/dev/test objects, classifiers
         self.training_objectlabels = None
@@ -40,6 +43,10 @@ class HypernymHandler:
             return self.index_of_first_hypernym + hypernym_offset
         except ValueError:
             return None
+
+    def hypernym_ixlabel(self, hypernym_index):
+        offset = hypernym_index - self.index_of_first_hypernym
+        return self.hypernym_names[offset]
         
     ##
     # classifiers for hypernyms:
@@ -52,10 +59,8 @@ class HypernymHandler:
         # make train/dev/test split
         random.seed(random_seed)
         
-        available_objects = self.object_hypernyms.keys()
-        
-        self.training_objectlabels = random.sample(available_objects, int(trainpercent * len(available_objects)))
-        nontraining_objectlabels = [ o for o in available_objects if o not in self.training_objectlabels]
+        self.training_objectlabels = random.sample(self.object_names, int(trainpercent * len(self.object_names)))
+        nontraining_objectlabels = [ o for o in self.object_names if o not in self.training_objectlabels]
         self.dev_objectlabels = random.sample(nontraining_objectlabels, int(0.5 * len(nontraining_objectlabels)))
         self.test_objectlabels = [o for o in nontraining_objectlabels if o not in self.dev_objectlabels]
 
@@ -65,7 +70,7 @@ class HypernymHandler:
         self.classifiers =  { }
         
         for hypernym in self.hypernym_names:
-            postraininglabels = [o for o in available_objects if hypernym in self.object_hypernyms[o]]
+            postraininglabels = [o for o in self.object_names if hypernym in self.object_hypernyms[o]]
             if len(postraininglabels) == 0:
                 # no training data for this hypernym
                 continue 
@@ -100,7 +105,126 @@ class HypernymHandler:
                 yield( hypernym, self.classifiers[hypernym].predict(X), [int(ell in gold_hyponyms) for ell in section_objectlabels])
 
 
+    ##
+    # adapt parameters for the SDS model to the presence of hypernyms
+    def adapt_sds_params(self, global_param, scenario_concept_param, word_concept_param, selpref_param, vgindex_obj):
+        ## global parameters:
+        # add a concept for each hypernym, and a matching word
+        num_hyper = len(self.hypernym_names)
+        global_param["num_words"] += num_hyper
+        global_param["num_concepts"] += num_hyper
 
+        ## scenario/concept weights:
+        # scenario/hypernym weight is average of scenario/concept weights
+        # for hyponym concepts
+        for h in self.hypernym_names:
+            h_id = self.hypernym_index(h)
+            hypos = [vgindex_obj.o2ix(o) for o in self.object_names if h in self.object_hypernyms[o]]
+            if len(hypos) == 0:
+                raise Exception("shouldn't be here " + h)
+
+            # entry for the concept that is the hypernym ID:
+            # "scenario": list of all scenario IDs,
+            # "weight": average weight across all hyponym IDs for this scenario
+            scenario_concept_param[ h_id ] = { "scenario" : [], "weight" : [ ]}
+            for scenario_no in range(global_param["num_scenarios"] - 1):
+                # weights are log probabilities.
+                # so do sum of exp's of weights that all hyponyms have for this scenario
+                weights = [ ]
+                for hoid in hypos:
+                    if scenario_no in scenario_concept_param[ hoid ]["scenario"]:
+                        scix = scenario_concept_param[ hoid ]["scenario"].index(scenario_no)
+                        weights.append( scenario_concept_param[ hoid ]["weight"][scix])
+
+                if len(weights) > 0:
+                    summed_weight = sum([math.exp(w) for w in weights])
+                    # average, and log, and store
+                    scenario_concept_param[ h_id ]["scenario"].append(scenario_no)
+                    scenario_concept_param[ h_id ]["weight"].append( math.log(summed_weight / len(weights)) )
+
+        ## word/concept weights:
+        # nothing to add, a hypernym word only maps to the hypernym concept
+
+        ## selectional preference weights:
+        # average of concept-specific preferences
+        # for hyponym concepts
+        
+        # for each predicate index, collect weights of hyponyms
+        for h in self.hypernym_names:
+            h_id = self.hypernym_index(h)
+            hypos = [vgindex_obj.o2ix(o) for o in self.object_names if h in self.object_hypernyms[o]]
+            if len(hypos) == 0:
+                raise Exception("shouldn't be here " + h)
+
+            # compute separately for arg0 and arg1
+            for argpos in ["arg0", "arg1"]:
+                # mapping predicate index -> list of log weights of hyponyms of h
+                predix_weights = defaultdict(list)
+                # iterate through predix/argix pairs for this arg position
+                for index, entry in enumerate(selpref_param[ argpos ]["config"]):
+                    predix, argix = entry
+                    # the argument is one of the hyponyms: store the corresponding weight
+                    if argix in hypos: predix_weights[ predix ].append( selpref_param[ argpos ]["weight"][index] )
+
+                # for each predicate index, store the average weight for the hypernym
+                for predix in predix_weights:
+                    selpref_param[ argpos ]["config"].append( (predix, h_id) )
+                    selpref_param[ argpos ]["weight"].append( math.log( sum([math.exp(w) for w in predix_weights[predix ]]) / len(hypos) ) )
+            
+
+        
+        return (global_param, scenario_concept_param, word_concept_param, selpref_param)
+
+
+    #####
+    # compute additional parameters for hypernymy handling in SDS
+    #
+    # returns:
+    # hypernymy parameters for SDS, format
+    # { "concept-hyper" : 
+    #   { concept index : {"hyper" : list of hypernym concept indices,
+    #                      "weight" : list of log weights matching the hypernym concept indices }},
+    #  "hyper-hyper" : SOMETHING }
+    #
+    # plus list of indices of training object labels
+    def compute_hyper_param(self, global_param, vgindex_obj, vec_obj, condition = "ch", random_seed = 0):
+        if condition != "ch":
+            raise Exception("can't handle other conditions than ch yet")
+
+        # train hypernymy classifiers.
+        # this also sets self.training_objectlabels,
+        #   self.dev_objectlabels ,self.test_objectlabels.
+        # We want to return training object labels too.
+        self.make_hypernym_classifiers(vec_obj, random_seed = random_seed)
+
+        # get log prob predictions, for each hypernym, for all object labels
+        retv = { "concept-hyper" : { }}
+
+        # basis for prediction: vectors
+        X = [  vec_obj.object_vec[label] for label in self.object_names ]
+        # object IDs
+        object_ids = [vgindex_obj.o2ix(ell) for ell in self.object_names]
+
+        for hypernym in self.hypernym_names:
+            if hypernym not in self.classifiers:
+                # couldnt' train a classifier for this one
+                continue
+
+            hyperid = self.hypernym_index(hypernym)
+
+            # we do have a classifier, use it
+            predictions = self.classifiers[hypernym].predict_log_proba(X)
+
+            # and store the results
+            for index, objid in enumerate(object_ids):
+                if objid not in retv["concept-hyper"]: retv["concept-hyper"][objid] = {"hyper" : [], "weight":[]}
+                retv["concept-hyper"][objid]["hyper"].append(hyperid)
+                retv["concept-hyper"][objid]["weight"].append( predictions[ index ] )
+
+        return (retv, [vgindex_obj.o2ix(o) for o in self.training_objectlabels])
+
+          
+        
     ################
     # main preprocessing step:
     # for the given set of frequent object labels,

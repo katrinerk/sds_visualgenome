@@ -37,44 +37,41 @@ if __name__ == '__main__':
     counter = 0
 
     # process each utterance go through utterances in the input file,
-    passagelength_runtime = defaultdict(list)
-
-    passages = [ ]
+    passagelength_runtime = [ ]
 
     for passage in  sds_obj.each_passage_json(verbose = False):
-        passagelen = len(passage)
+        numwords = sum([len(sent) for sentid, sent in passage])
         
         # make a timer to see how long it takes to do
         # graph creation + inference
         tic=timeit.default_timer()
 
         with concurrent.futures.ProcessPoolExecutor(max_workers=1) as executor:
-            thismap, thismentalfile = executor.submit(onediscourse_map, passage, sds_obj).result()
+            result = executor.submit(onediscourse_map, passage, sds_obj).result()
+
 
         # stop timer
         toc=timeit.default_timer()
-        passagelength_runtime[passagelen].append(toc - tic)
+        passagelength_runtime.append( (numwords / len(passage), toc - tic) )
         
-        print(thismap)
-        print()
-        print(thismentalfile)
+        if result is not None:
+            thismap, thismentalfile, thiscoref = result
+            results.append({"sentids" : [sentid for sentid, _ in passage], "MAP" : thismap, "mentalfiles" : thismentalfile, "coref" : thiscoref})
 
-        if thismap is not None:
-            passages.append({"passage" : passage, "MAP" : thismap, "mentalfiles" : thismentalfile})
 
-        
+        # print("HIER len passage", len(passage), [sentid for sentid, _ in passage])
+        # sys.exit(0)
         counter += 1
         if counter % 10 == 0: print(counter)
 
 
     # write results
     # into the output zip file
-    # HIER
-    # zipfilename, filename = vgpath_obj.sds_output_zipfilename( write = True)
-    # with zipfile.ZipFile(zipfilename, "w", zipfile.ZIP_DEFLATED) as azip:
-    #     azip.writestr(filename, json.dumps(results))                
+    zipfilename, filename = vgpath_obj.sds_output_zipfilename( write = True)
+    with zipfile.ZipFile(zipfilename, "w", zipfile.ZIP_DEFLATED) as azip:
+        azip.writestr(filename, json.dumps(results))                
 
-    # write average runtimes by sentence length
-    for ell in sorted(passagelength_runtime.keys()):
-        print("Passage length", ell, "#passages", len(passagelength_runtime[ell]),
-              "mean runtime", round(statistics.mean(passagelength_runtime[ell]), 3))
+    # show average runtimes by sentence length
+    if len(passagelength_runtime) > 0:
+        print("Average sentence length", round(statistics.mean([length for length, _ in passagelength_runtime]), 3))
+        print("Mean runtime", round(statistics.mean([runtime for _, runtime in passagelength_runtime]), 3))

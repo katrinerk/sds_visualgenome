@@ -51,7 +51,7 @@ class SDSD(SDS):
     #    ("r", "arg0", pred discourse referent, argument 0 discourse referent)
     #    ("prew", word label index, discourse referent)
     #    ("prer", "arg0", pred discourse referent, argument 0 discourse referent)
-    def each_passage_json(self, verbose = False):
+    def each_passage_json(self, verbose = True):
         inputzipfilename, filename = self.vgpath_obj.sds_sentence_zipfilename()
         with zipfile.ZipFile(inputzipfilename) as azip:
             with azip.open(filename) as f:
@@ -63,19 +63,25 @@ class SDSD(SDS):
         # passage: a list of sentences
         for passage in passages:
             transformed_passage = [ ]
+            passage_okay = True
             
             for sentence_dict in passage:
                 result = self._sanitycheck_sentence(sentence_dict)
 
                 if result.get("malformed_lit", False):
                     malformed_sents += 1
+                    passage_okay = False
                 elif result.get("reflexive", False):
                     reflexive_sents += 1
+                    passage_okay = False
 
                 else:
                     transformed_passage.append( (result["sentence_id"], result["sentence"]))
 
-            yield transformed_passage
+            if passage_okay:
+                yield transformed_passage
+            else:
+                print("HIER passage not okay")
 
         if(verbose):
             print("Number of malformed sentences:", malformed_sents)
@@ -88,6 +94,8 @@ class SDSD(SDS):
         sentence_id = sentence_dict["sentence_id"]
         sentence = sentence_dict["sentence"]
 
+        # print("Sentence", sentence_id, sentence)
+        
         # sanity check: do we have a label for each literal?
         for lit in sentence:
             if lit[0] == "w" or lit[0] == "prew":
@@ -495,36 +503,49 @@ class SDSD(SDS):
 def onediscourse_map(sentences, sds_obj):
     mentalfiles = {"entity": [ ], "roles":[]}
     mapresults = [ ]
+    corefresults = [ ]
+    paragraph_okay = True
     
     for sentence_id, sentence in sentences:
         fg = sds_obj.build_factor_graph(sentence, mentalfiles)
         if fg is None:
-            # facctor graph not successfuly built
+            # factor graph not successfuly built
             print("Error in creating factor graph for sentence, skipping", sentence_id)
-            continue
-
-        # do the inference
-        thismap = fg.map_inference()
-
-        # store the MAP result
-        mapresults.append(thismap)
-            
-        # store new entries to the mental files
-        mentalfiles =  sds_obj.extend_mentalfiles_map(thismap, sentence_id, sentence, mentalfiles) 
+            paragraph_okay = False
+            break
 
         # do the inference:
         # max-product algorithm
-        # try:
-        #     # do the inference
-        #     thismap = fg.map_inference()
+        try:
+            thismap = fg.map_inference()
 
-        #     # store the MAP result
-        #     mapresults.append(thismap)
+            # store the MAP result
+            mapresults.append(thismap)
             
-        #     # store new entries to the mental files
-        #     mentalfiles =  sds_obj.extend_mentalfiles_map(thismap, sentence_id, sentence, mentalfiles) 
-        # except Exception:
-        #     print("Error in processing sentence, skipping:", sentence_id)
+            # store new entries to the mental files
+            mentalfiles =  sds_obj.extend_mentalfiles_map(thismap, sentence_id, sentence, mentalfiles)
+
+            # did we determine any coreference?
+            if "drefindex" in thismap:
+                # yes: read off the mapping from discourse referent to mental file entry.
+                
+                # dref_mfindex: list of pairs (discourse referent, index into the mental files).
+                # iterate over those pairs.
+                dref_mfindex = sds_obj.coref_readoff_map(thismap)
+                for dref, mfindex in dref_mfindex.items():
+                    # entry: entity entry at this mental file index,
+                    # dictionary:
+                    #  "dref" : discourse referent
+                    #  "entry": list of pairs ( concept index, probability)
+                    entry = mentalfiles["entity"][mfindex]
+                    corefresults.append( [ [sentence_id, dref],  entry["dref"],  [cix for cix, prob in entry["entry"] if prob > 0.0]] )
+
+        except Exception:
+            print("Error in running inference on sentence, skipping:", sentence_id)
+            paragraph_okay = False
 
 
-    return (mapresults, mentalfiles)
+    if not paragraph_okay:
+        return None
+    else:
+        return (mapresults, mentalfiles, corefresults)

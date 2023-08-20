@@ -491,7 +491,8 @@ class VGSentences:
 
     # iterate through VG representation,
     # return each image (from either the train or test split, as given in splitsection)
-    # as a "sentence" 
+    # as a "sentence"
+    
     def each_sentence(self, vgobj, vgobjects_attr_rel = None, traintest_split = None, splitsection = "test"):
 
         if vgobjects_attr_rel is None:
@@ -768,6 +769,11 @@ class VGSentences:
         return (sentid, words, roles)
         
 
+    # given a sentence as words and roles, remove either all occurrences of given object IDs,
+    # or all occurrences of given literals. if keep_these_words is nonempty,
+    # exempt them from removal.
+    #
+    # return: pair of words, roles
     def remove_from_sent(self, words, roles, oids = None, literals = None, keep_these_words = [ ]):
         if oids is None and literals is None:
             raise Exception("SDS input util error: need either object IDs or literals for removal")

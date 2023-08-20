@@ -101,7 +101,7 @@ class SentencePrinter:
         if len(wordliterals["prew"]) > 0 or len(pred_args["prer"]) > 0:
             print("--Presupposed--", file = self.outf)
             self.write_aux(wordliterals["prew"], dref_names, dref_wordtype, pred_args["prer"], target_dref, targetindex, scenario_concept_assignment)
-            print("----")
+            print("----", file = self.outf)
 
         if len(wordliterals['w']) > 0 or len(pred_args['r']) > 0:
             self.write_aux(wordliterals['w'], dref_names, dref_wordtype, pred_args['r'], target_dref, targetindex, scenario_concept_assignment)

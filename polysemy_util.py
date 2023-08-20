@@ -20,7 +20,15 @@ from vec_util import VectorInterface
 from vgpaths import VGPaths
 
 class SyntheticPolysemes:
-    def __init__(self, vgpath_obj, vgindex_obj, frequent_words, concept_scenario_mapping, max_fraction = 1.0, wordbins = None):
+    # vgpath__obj: object for accessing filenames
+    # vgindex_obj: object for mapping between labels and numeric IDs
+    # frequent_words: dicionary with VG frequent objects, attributes, relation labels
+    # concept_scenario_mapping: mapping from concepts to scenarios, used to only assign polysemy
+    #       to words that have a scenario, rather than the dummy scenario used for very frequent words
+    # max_fraction: maximum fraction of words to make ambiguous
+    # wordbins: provide if synthetic polysemes should be from the same frequency bin
+    # all_polysemous: if true, make all words polysemous, no randomness
+    def __init__(self, vgpath_obj, vgindex_obj, frequent_words, concept_scenario_mapping, max_fraction = 1.0, wordbins = None, all_polysemous = False):
 
         # store global data
         self.vec_obj = VectorInterface(vgpath_obj)
@@ -29,6 +37,7 @@ class SyntheticPolysemes:
         self.concept_scenario_mapping = concept_scenario_mapping
 
         self.max_fraction = max_fraction
+        self.all_polysemous = all_polysemous
         self.wordbins = wordbins
 
         # in rankings of similarity among words,
@@ -42,6 +51,8 @@ class SyntheticPolysemes:
         self.arg0counter = Counter([a for _, a in self.vec_obj.predarg0_vec.keys()])
         self.arg1counter = Counter([a for _, a in self.vec_obj.predarg1_vec.keys()])
 
+        # setting up for incremental invention of polysemy
+        self.next_wordid = None
 
     ###
     # main method:
@@ -52,20 +63,54 @@ class SyntheticPolysemes:
     #
     # returns: transformed sentences, along with
     # characterizations of the new polysemous "words"
-    def make(self, sentences, next_wordid, simlevel = 3, singleword = False):
-        print("simlevel:", simlevel)
+    def make(self, sentences, next_wordid, simlevel = 3, singleword = False, verbose = True):
+        if verbose:
+            print("simlevel:", simlevel)
 
+        
         gold = {}
+        random.seed(500)
 
+        sentences_transformed, gold, _ = self._aux_make(sentences, next_wordid, gold, simlevel, singleword)
+        return (sentences_transformed, gold)
 
+    #################
+    # incremental hallucination of polysemy
+    def initialize_stepwise(self, next_wordid, simlevel = 3, singleword = False):
+        self.next_wordid = next_wordid
+        self.gold = { }
+        self.simlevel = simlevel
+        self.singleword = singleword
+        random.seed(6543)
+
+    def make_stepwise(self, sentence):
+        if self.next_wordid is None:
+            raise Exception("cannot use make_stepwise without initialize_stepwise")
+
+        sentence_transformed_aslist, self.gold, self.next_wordid = self._aux_make([sentence], self.next_wordid, self.gold, self.simlevel, self.singleword)
+        return sentence_transformed_aslist[0]
+
+    def finalize_stepwise(self):
+        self.next_wordid = None
+        return self.gold
+    
+    #################
+    # function doing the work:
+    # given sentences, hallucinate polysemy,
+    # store in given gold dictionary, next polyseme gets ID next_wordid,
+    # use given similarity level.
+    # returns:
+    # transformed sentences, augmented gold dictionary,
+    # next_wordid after this sentence
+    #
+    # transformed sentences are 4-tuples:
+    # sentence ID, non-transformed words, transformed words, roles
+    def _aux_make(self, sentences, next_wordid, gold, simlevel, singleword):
         sentences_transformed = [ ]
         
         ctype_map = {VGOBJECTS : VGOBJECTS, VGATTRIBUTES:VGATTRIBUTES, VGRELATIONS:VGRELATIONS, "predarg0" : VGRELATIONS, "predarg1" : VGRELATIONS}
 
-        random.seed(500)
-
         for sentid, words, roles in sentences:
-
 
             ##
             # determine words that could be made into cloze items.
@@ -78,7 +123,13 @@ class SyntheticPolysemes:
             ##
             # select candidates to make cloze items: if args.singleword, then one, 
             # else up to 1/2 of all words in the sentence
-            numwords_for_cloze = 1 if singleword else random.randint(1, max(1, int(len(candidates) * self.max_fraction)))
+            if self.all_polysemous:
+                numwords_for_cloze = len(candidates)
+            elif singleword:
+                numwords_for_cloze = 1
+            else:
+                numwords_for_cloze = random.randint(1, max(1, int(len(candidates) * self.max_fraction)))
+                
             words_for_cloze = random.sample(candidates, numwords_for_cloze)
 
             ##
@@ -129,8 +180,10 @@ class SyntheticPolysemes:
             ## transformed testsentence is done
             sentences_transformed.append( [sentid, otherwords, targetwords, roles] )
 
-        return (sentences_transformed, gold)
-
+        return (sentences_transformed, gold, next_wordid)
+        
+        
+        
     ##
     # making a cloze pair for one object
     def make_obj_cloze(self, conceptid, simlevel):
